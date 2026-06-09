@@ -350,3 +350,216 @@
   color: rgba(255, 255, 255, 0.85);
   background: rgba(255, 255, 255, 0.08);
 }
+
+/* ======================== 管理后台组件样式 ======================== */
+
+/* 亮色模式 - 表格 */
+[data-theme='light'] .admin-layout .ant-table {
+  background: #fff;
+}
+
+[data-theme='light'] .admin-layout .ant-table-thead > tr > th {
+  background: #fafafa;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+[data-theme='light'] .admin-layout .ant-table-tbody > tr > td {
+  color: rgba(0, 0, 0, 0.65);
+}
+
+[data-theme='light'] .admin-layout .ant-table-tbody > tr:hover > td {
+  background: #fafafa;
+}
+
+[data-theme='light'] .admin-layout .ant-table-fixed-right {
+  background: #fff;
+}
+
+[data-theme='light'] .admin-layout .ant-pagination .ant-pagination-item {
+  background: #fff;
+}
+
+[data-theme='light'] .admin-layout .ant-pagination .ant-pagination-item a {
+  color: rgba(0, 0, 0, 0.65);
+}
+
+[data-theme='light'] .admin-layout .ant-pagination .ant-pagination-total-text {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+[data-theme='light'] .admin-layout .ant-btn-default {
+  background: #fff;
+  border-color: #d9d9d9;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+[data-theme='light'] .admin-layout .ant-btn-default:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+}
+
+[data-theme='light'] .admin-layout .ant-tag {
+  border-color: #d9d9d9;
+}
+
+[data-theme='light'] .admin-layout .ant-modal-content {
+  background: #fff;
+}
+
+[data-theme='light'] .admin-layout .ant-modal-header {
+  background: #fff;
+  border-bottom-color: #f0f0f0;
+}
+
+[data-theme='light'] .admin-layout .ant-modal-title {
+  color: rgba(0, 0, 0, 0.88);
+}
+
+[data-theme='light'] .admin-layout .ant-form-item-label > label {
+  color: rgba(0, 0, 0, 0.65);
+}
+
+[data-theme='light'] .admin-layout .ant-popconfirm .ant-popconfirm-message-title {
+  color: rgba(0, 0, 0, 0.88);
+}
+
+[data-theme='light'] .admin-layout .ant-select-dropdown {
+  background: #fff;
+}
+
+[data-theme='light'] .admin-layout .ant-select-item {
+  color: rgba(0, 0, 0, 0.65);
+}
+
+[data-theme='light'] .admin-layout .ant-select-item-option-active,
+[data-theme='light'] .admin-layout .ant-select-item-option-selected {
+  background: #f5f5f5;
+}
+
+/* 暗色模式 - 表格 */
+[data-theme='dark'] .admin-layout .ant-table {
+  background: #1f1f1f;
+}
+
+[data-theme='dark'] .admin-layout .ant-table-thead > tr > th {
+  background: #262626;
+  color: rgba(255, 255, 255, 0.85);
+  border-bottom-color: #303030;
+}
+
+[data-theme='dark'] .admin-layout .ant-table-tbody > tr > td {
+  color: rgba(255, 255, 255, 0.65);
+  border-bottom-color: #303030;
+  background: #1f1f1f;
+}
+
+[data-theme='dark'] .admin-layout .ant-table-tbody > tr:hover > td {
+  background: #262626;
+}
+
+[data-theme='dark'] .admin-layout .ant-table-cell-row-hover {
+  background: #262626 !important;
+}
+
+[data-theme='dark'] .admin-layout .ant-table-fixed-right {
+  background: #1f1f1f;
+}
+
+[data-theme='dark'] .admin-layout .ant-table-fixed-right::before {
+  background: #303030;
+}
+
+[data-theme='dark'] .admin-layout .ant-pagination .ant-pagination-item {
+  background: #303030;
+}
+
+[data-theme='dark'] .admin-layout .ant-pagination .ant-pagination-item a {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+[data-theme='dark'] .admin-layout .ant-pagination .ant-pagination-total-text {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+[data-theme='dark'] .admin-layout .ant-pagination .ant-pagination-options .ant-select-selector {
+  background: #303030;
+  border-color: #424242;
+}
+
+[data-theme='dark'] .admin-layout .ant-btn-default {
+  background: #303030;
+  border-color: #424242;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+[data-theme='dark'] .admin-layout .ant-btn-default:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+}
+
+[data-theme='dark'] .admin-layout .ant-switch {
+  background: #424242;
+}
+
+[data-theme='dark'] .admin-layout .ant-modal-content {
+  background: #262626;
+}
+
+[data-theme='dark'] .admin-layout .ant-modal-header {
+  background: #262626;
+  border-bottom-color: #303030;
+}
+
+[data-theme='dark'] .admin-layout .ant-modal-title {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+[data-theme='dark'] .admin-layout .ant-form-item-label > label {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+[data-theme='dark'] .admin-layout .ant-popconfirm .ant-popconfirm-message-title {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+[data-theme='dark'] .admin-layout .ant-select-dropdown {
+  background: #303030;
+}
+
+[data-theme='dark'] .admin-layout .ant-select-item {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+[data-theme='dark'] .admin-layout .ant-select-item-option-active,
+[data-theme='dark'] .admin-layout .ant-select-item-option-selected {
+  background: #424242;
+}
+
+/* 暗色模式 - 输入框和下拉框 */
+[data-theme='dark'] .admin-layout .ant-input,
+[data-theme='dark'] .admin-layout .ant-input-number,
+[data-theme='dark'] .admin-layout .ant-input-affix-wrapper,
+[data-theme='dark'] .admin-layout .ant-input-search .ant-input {
+  background: #303030 !important;
+  border-color: #424242 !important;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+[data-theme='dark'] .admin-layout .ant-input::placeholder,
+[data-theme='dark'] .admin-layout .ant-input-number-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+[data-theme='dark'] .admin-layout .ant-select-selector {
+  background: #303030 !important;
+  border-color: #424242 !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+[data-theme='dark'] .admin-layout .ant-select-selection-item {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+[data-theme='dark'] .admin-layout .ant-select-selection-placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}

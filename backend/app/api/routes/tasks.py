@@ -12,12 +12,13 @@ from app.schemas.generation import (
     TaskDetailResponse,
     TaskListResponse
 )
+from app.schemas.common import ApiResponse
 from app.services import generation_service
 
 router = APIRouter(prefix="/tasks", tags=["任务"])
 
 
-@router.get("/{task_id}", response_model=TaskDetailResponse, summary="查询任务详情")
+@router.get("/{task_id}", response_model=ApiResponse[TaskDetailResponse], summary="查询任务详情")
 def get_task_detail(
     task_id: str,
     current_user: User = Depends(get_current_user),
@@ -50,7 +51,7 @@ def get_task_detail(
     if task.result_json and "images" in task.result_json:
         images = task.result_json["images"]
 
-    return TaskDetailResponse(
+    response_data = TaskDetailResponse(
         task_id=task.task_id,
         status=task.status,
         model_key=task.model_key,
@@ -68,8 +69,15 @@ def get_task_detail(
         finished_at=task.finished_at
     )
 
+    return ApiResponse(
+        code=0,
+        message="success",
+        data=response_data,
+        success=True
+    )
 
-@router.get("", response_model=TaskListResponse, summary="查询我的任务列表")
+
+@router.get("", response_model=ApiResponse[TaskListResponse], summary="查询我的任务列表")
 def get_my_tasks(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -116,7 +124,14 @@ def get_my_tasks(
             finished_at=task.finished_at
         ))
 
-    return TaskListResponse(
+    response_data = TaskListResponse(
         total=result["total"],
         items=items
+    )
+
+    return ApiResponse(
+        code=0,
+        message="success",
+        data=response_data,
+        success=True
     )

@@ -1,26 +1,50 @@
 /**
  * 认证相关接口
  */
-import request from '@/utils/request'
+import { httpGet, httpPost } from '@/utils/request'
 
-// 注册
-export function register(data: {
+// 请求参数类型
+export interface RegisterParams {
   username: string
   password: string
   confirm_password: string
-}) {
-  return request.post('/auth/register', data)
+}
+
+export interface LoginParams {
+  username: string
+  password: string
+}
+
+// 响应数据类型
+export interface UserInfo {
+  id: number
+  username: string
+  nickname?: string
+  avatar_url?: string
+}
+
+export interface TokenResult {
+  access_token: string
+  token_type: string
+  user: UserInfo
+}
+
+export interface RegisterResult {
+  message: string
+  user: UserInfo
+}
+
+// 注册
+export function register(data: RegisterParams) {
+  return httpPost<RegisterResult>('/auth/register', data)
 }
 
 // 登录
-export function login(data: {
-  username: string
-  password: string
-}) {
-  return request.post('/auth/login', data)
+export function login(data: LoginParams) {
+  return httpPost<TokenResult>('/auth/login', data)
 }
 
 // 获取当前用户信息
 export function getUserInfo() {
-  return request.get('/auth/me')
+  return httpGet<UserInfo>('/auth/me')
 }

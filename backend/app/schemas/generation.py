@@ -17,6 +17,7 @@ class TaskCreateResponse(BaseModel):
     task_id: str = Field(..., description="任务ID")
     status: str = Field(..., description="任务状态")
     frozen_points: int = Field(..., description="冻结积分")
+    error_message: Optional[str] = Field(None, description="错误信息，仅在任务创建失败时返回")
 
 
 class TaskDetailResponse(BaseModel):

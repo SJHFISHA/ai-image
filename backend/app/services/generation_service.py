@@ -84,23 +84,68 @@ def create_image_task(
         raise
 
 
-def mock_generate_image(task_id: str) -> dict:
+def execute_image_generation(
+    db: Session,
+    task: GenerationTask,
+    prompt: str
+) -> tuple[bool, Optional[str], Optional[dict]]:
     """
-    Mock生图函数（用于测试）
+    执行生图任务
 
     Args:
-        task_id: 任务ID
+        db: 数据库Session
+        task: 任务对象
+        prompt: 提示词
 
     Returns:
-        生成结果字典
+        (success, error_message, result) 三元组
     """
-    # 模拟生成成功
-    return {
-        "images": [
-            "https://example.com/test-image-1.png",
-            "https://example.com/test-image-2.png"
-        ]
-    }
+    from app.providers.api_gateway_provider import api_gateway_provider
+    from app.api.routes.image import extract_images_from_api_result
+
+    try:
+        # 更新任务状态为运行中
+        task.status = "running"
+        db.commit()
+
+        app_logger.info(f"开始调用API生图: task_id={task.task_id}")
+
+        # 调用 API 中转站
+        api_result = api_gateway_provider.generate_image(
+            model=task.model_key,
+            prompt=prompt,
+            size=task.image_size or "1024x1024",
+            count=task.image_count or 1,
+            quality="low",
+            format="jpeg"
+        )
+
+        # 解析返回结果，提取图片 URL 或 base64
+        images = extract_images_from_api_result(api_result)
+
+        if not images:
+            raise Exception(f"API未返回图片数据，原始返回: {api_result}")
+
+        # 构建结果
+        result = {"images": images}
+
+        # 成功结算
+        settle_task_success(db, task.task_id, result)
+        task.status = "success"
+
+        app_logger.info(f"生图成功: task_id={task.task_id}, images={len(images)}")
+
+        return True, None, result
+
+    except Exception as e:
+        error_msg = str(e)
+        app_logger.error(f"生图失败: task_id={task.task_id}, error={error_msg}")
+
+        # 失败结算，退回积分
+        settle_task_failed(db, task.task_id, error_msg)
+        task.status = "failed"
+
+        return False, error_msg, None
 
 
 def settle_task_success(

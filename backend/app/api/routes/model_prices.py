@@ -12,12 +12,13 @@ from app.schemas.model_price import (
     ModelPriceConfigResponse,
     ModelPriceConfigListResponse
 )
+from app.schemas.common import ApiResponse
 from app.services import model_price_service
 
 router = APIRouter(prefix="/model-prices", tags=["模型价格"])
 
 
-@router.get("", response_model=ModelPriceConfigListResponse, summary="查询模型价格配置")
+@router.get("", response_model=ApiResponse[ModelPriceConfigListResponse], summary="查询模型价格配置")
 def get_model_prices(
     capability_type: Optional[str] = Query(None, description="能力类型: image, video, text, audio"),
     current_user: User = Depends(get_current_user),
@@ -51,7 +52,14 @@ def get_model_prices(
         for config in configs
     ]
 
-    return ModelPriceConfigListResponse(
+    response_data = ModelPriceConfigListResponse(
         total=len(items),
         items=items
+    )
+
+    return ApiResponse(
+        code=0,
+        message="success",
+        data=response_data,
+        success=True
     )

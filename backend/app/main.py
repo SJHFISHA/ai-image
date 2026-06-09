@@ -2,6 +2,7 @@
 FastAPI 应用入口
 """
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
@@ -53,12 +54,63 @@ def create_app() -> FastAPI:
     app.include_router(api_router)
 
     # 全局异常处理
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        """HTTPException 处理"""
+        # 根据状态码映射业务错误码
+        status_code_mapping = {
+            400: 40000,
+            401: 40100,
+            403: 40300,
+            404: 40400,
+            409: 40900,
+            500: 50000,
+        }
+        business_code = status_code_mapping.get(exc.status_code, 50000)
+
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "code": business_code,
+                "message": exc.detail,
+                "data": None,
+                "success": False
+            }
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        """参数校验错误处理"""
+        errors = []
+        for error in exc.errors():
+            field = " -> ".join(str(loc) for loc in error["loc"])
+            errors.append(f"{field}: {error['msg']}")
+
+        error_message = "参数校验失败: " + "; ".join(errors)
+        app_logger.warning(f"参数校验错误: {error_message}")
+
+        return JSONResponse(
+            status_code=422,
+            content={
+                "code": 40001,
+                "message": error_message,
+                "data": None,
+                "success": False
+            }
+        )
+
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
+        """未捕获异常处理"""
         app_logger.error(f"未捕获的异常: {str(exc)}")
         return JSONResponse(
             status_code=500,
-            content={"detail": "服务器内部错误，请稍后重试"}
+            content={
+                "code": 50000,
+                "message": "服务器内部错误，请稍后重试",
+                "data": None,
+                "success": False
+            }
         )
 
     return app

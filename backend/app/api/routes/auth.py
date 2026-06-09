@@ -14,12 +14,13 @@ from app.schemas.auth import (
     RegisterResponse,
     UserInfo
 )
+from app.schemas.common import ApiResponse
 from app.services import auth_service
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 
 
-@router.post("/register", response_model=RegisterResponse, summary="用户注册")
+@router.post("/register", response_model=ApiResponse[RegisterResponse], summary="用户注册")
 def register(request: RegisterRequest, db: Session = Depends(get_db)):
     """
     用户注册
@@ -35,7 +36,7 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
         confirm_password=request.confirm_password
     )
 
-    return RegisterResponse(
+    response_data = RegisterResponse(
         message="注册成功",
         user=UserInfo(
             id=user.id,
@@ -45,8 +46,15 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
         )
     )
 
+    return ApiResponse(
+        code=0,
+        message="注册成功",
+        data=response_data,
+        success=True
+    )
 
-@router.post("/login", response_model=TokenResponse, summary="用户登录")
+
+@router.post("/login", response_model=ApiResponse[TokenResponse], summary="用户登录")
 def login(request: LoginRequest, db: Session = Depends(get_db)):
     """
     用户登录
@@ -62,19 +70,33 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
         password=request.password
     )
 
-    return TokenResponse(**result)
+    response_data = TokenResponse(**result)
+
+    return ApiResponse(
+        code=0,
+        message="登录成功",
+        data=response_data,
+        success=True
+    )
 
 
-@router.get("/me", response_model=UserInfo, summary="获取当前用户信息")
+@router.get("/me", response_model=ApiResponse[UserInfo], summary="获取当前用户信息")
 def get_me(current_user: User = Depends(get_current_user)):
     """
     获取当前登录用户信息
 
     需要在请求头中携带: Authorization: Bearer <token>
     """
-    return UserInfo(
+    response_data = UserInfo(
         id=current_user.id,
         username=current_user.username,
         nickname=current_user.nickname,
         avatar_url=current_user.avatar_url
+    )
+
+    return ApiResponse(
+        code=0,
+        message="success",
+        data=response_data,
+        success=True
     )

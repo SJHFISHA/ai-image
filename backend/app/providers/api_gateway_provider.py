@@ -68,7 +68,10 @@ class ApiGatewayProvider(BaseProvider):
         app_logger.info(f"调用API中转站生图: model={model}, size={size}, count={count}")
 
         try:
-            response = requests.post(
+            session = requests.Session()
+            session.trust_env = False
+
+            response = session.post(
                 url,
                 json=payload,
                 headers=self._get_headers(),
@@ -128,7 +131,10 @@ class ApiGatewayProvider(BaseProvider):
         app_logger.info(f"调用API中转站生视频: model={model}, duration={duration}, resolution={resolution}")
 
         try:
-            response = requests.post(
+            session = requests.Session()
+            session.trust_env = False
+
+            response = session.post(
                 url,
                 json=payload,
                 headers=self._get_headers(),

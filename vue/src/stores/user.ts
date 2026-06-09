@@ -4,15 +4,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { login as loginApi, register as registerApi, getUserInfo } from '@/api/auth'
+import type { UserInfo, TokenResult } from '@/api/auth'
 import { message } from 'ant-design-vue'
 import router from '@/router'
-
-interface UserInfo {
-  id: number
-  username: string
-  nickname: string | null
-  avatar_url: string | null
-}
 
 export const useUserStore = defineStore('user', () => {
   // 状态
@@ -25,13 +19,13 @@ export const useUserStore = defineStore('user', () => {
   // 登录
   async function login(username: string, password: string) {
     try {
-      const res: any = await loginApi({ username, password })
+      const res = await loginApi({ username, password })
       token.value = res.access_token
       userInfo.value = res.user
       localStorage.setItem('access_token', res.access_token)
       // 恢复本地保存的头像
       const savedAvatar = localStorage.getItem('user_avatar')
-      if (savedAvatar) {
+      if (savedAvatar && userInfo.value) {
         userInfo.value.avatar_url = savedAvatar
       }
       message.success('登录成功')
@@ -61,11 +55,11 @@ export const useUserStore = defineStore('user', () => {
   // 获取用户信息
   async function fetchUserInfo() {
     try {
-      const res: any = await getUserInfo()
+      const res = await getUserInfo()
       userInfo.value = res
       // 恢复本地保存的头像
       const savedAvatar = localStorage.getItem('user_avatar')
-      if (savedAvatar) {
+      if (savedAvatar && userInfo.value) {
         userInfo.value.avatar_url = savedAvatar
       }
       return true

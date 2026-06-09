@@ -12,12 +12,13 @@ from app.schemas.point import (
     PointTransactionResponse,
     PointTransactionListResponse
 )
+from app.schemas.common import ApiResponse
 from app.services import point_service
 
 router = APIRouter(prefix="/user", tags=["积分"])
 
 
-@router.get("/points", response_model=PointBalanceResponse, summary="查询积分余额")
+@router.get("/points", response_model=ApiResponse[PointBalanceResponse], summary="查询积分余额")
 def get_points(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -28,10 +29,17 @@ def get_points(
     需要在请求头中携带: Authorization: Bearer <token>
     """
     balance = point_service.get_point_balance(db, current_user.id)
-    return PointBalanceResponse(**balance)
+    response_data = PointBalanceResponse(**balance)
+
+    return ApiResponse(
+        code=0,
+        message="success",
+        data=response_data,
+        success=True
+    )
 
 
-@router.get("/point-logs", response_model=PointTransactionListResponse, summary="查询积分流水")
+@router.get("/point-logs", response_model=ApiResponse[PointTransactionListResponse], summary="查询积分流水")
 def get_point_logs(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -53,7 +61,14 @@ def get_point_logs(
         page_size=page_size
     )
 
-    return PointTransactionListResponse(
+    response_data = PointTransactionListResponse(
         total=result["total"],
         items=[PointTransactionResponse.model_validate(t) for t in result["items"]]
+    )
+
+    return ApiResponse(
+        code=0,
+        message="success",
+        data=response_data,
+        success=True
     )

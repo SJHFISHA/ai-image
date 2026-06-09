@@ -84,3 +84,44 @@ def decode_access_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
+
+
+def create_admin_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """
+    创建管理员JWT token（payload中带 type: "admin" 用于区分普通用户）
+
+    Args:
+        data: token中包含的数据（至少包含 sub=admin_id, username）
+        expires_delta: 过期时间增量
+
+    Returns:
+        JWT token字符串
+    """
+    to_encode = data.copy()
+    to_encode["type"] = "admin"
+
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
+
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+    return encoded_jwt
+
+
+def decode_admin_token(token: str) -> Optional[dict]:
+    """
+    解析管理员JWT token，校验 type 字段必须为 "admin"
+
+    Args:
+        token: JWT token字符串
+
+    Returns:
+        token中的数据，如果不是管理员token或解析失败返回None
+    """
+    payload = decode_access_token(token)
+    if payload and payload.get("type") == "admin":
+        return payload
+    return None

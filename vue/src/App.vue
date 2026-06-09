@@ -21,8 +21,13 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 
-// 判断是否为登录/注册页，这些页面不显示侧边栏
-const isAuthPage = computed(() => ['login', 'register'].includes(route.name as string))
+// 判断是否为登录/注册页或管理员页面，这些页面不显示用户侧边栏
+const isAuthPage = computed(() => {
+  const name = route.name as string
+  if (['login', 'register'].includes(name)) return true
+  if (route.path.startsWith('/admin')) return true
+  return false
+})
 
 const { Sider, Content } = Layout
 
@@ -210,7 +215,8 @@ onMounted(async () => {
         </Layout>
       </template>
 
-      <div class="theme-toggle-btn" @click="toggleTheme">
+      <!-- 管理员页面不显示此灯泡，由 AdminLayout 自己管理 -->
+      <div v-if="!isAuthPage" class="theme-toggle-btn" @click="toggleTheme">
         <BulbOutlined v-if="!isDark" />
         <BulbFilled v-else />
       </div>

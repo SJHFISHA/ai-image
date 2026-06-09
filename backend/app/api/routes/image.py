@@ -11,8 +11,8 @@ from app.schemas.generation import (
     ImageGenerateRequest,
     TaskCreateResponse
 )
+from app.schemas.common import ApiResponse
 from app.services import generation_service
-from app.providers.api_gateway_provider import api_gateway_provider
 from app.utils.logger import app_logger
 
 router = APIRouter(prefix="/image", tags=["生图"])
@@ -88,7 +88,7 @@ def extract_images_from_api_result(api_result) -> list[str]:
     return images
 
 
-@router.post("/generate", response_model=TaskCreateResponse, summary="创建生图任务")
+@router.post("/generate", response_model=ApiResponse[TaskCreateResponse], summary="创建生图任务")
 def create_image_task(
     request: ImageGenerateRequest,
     current_user: User = Depends(get_current_user),
@@ -110,6 +110,7 @@ def create_image_task(
 
     需要在请求头中携带: Authorization: Bearer <token>
     """
+    # 创建任务
     task = generation_service.create_image_task(
         db=db,
         user_id=current_user.id,
@@ -117,48 +118,24 @@ def create_image_task(
         prompt=request.prompt
     )
 
-    # 调用真实 API 中转站
-    try:
-        app_logger.info(f"开始调用API生图: task_id={task.task_id}")
+    # 执行生图任务
+    success, error_msg, result = generation_service.execute_image_generation(
+        db=db,
+        task=task,
+        prompt=request.prompt
+    )
 
-        # 更新任务状态为运行中
-        task.status = "running"
-        db.commit()
-
-        # 调用 API 中转站
-        api_result = api_gateway_provider.generate_image(
-            model=task.model_key,
-            prompt=request.prompt,
-            size=task.image_size or "1024x1024",
-            count=task.image_count or 1,
-            quality="low",
-            format="jpeg"
-        )
-
-        # 解析返回结果，提取图片 URL 或 base64
-        images = extract_images_from_api_result(api_result)
-
-        if not images:
-            raise Exception(f"API未返回图片数据，原始返回: {api_result}")
-
-        # 构建结果
-        result = {"images": images}
-
-        # 成功结算
-        generation_service.settle_task_success(db, task.task_id, result)
-        task.status = "success"
-
-        app_logger.info(f"生图成功: task_id={task.task_id}, images={len(images)}")
-
-    except Exception as e:
-        # 失败结算，退回积分
-        error_msg = str(e)
-        app_logger.error(f"生图失败: task_id={task.task_id}, error={error_msg}")
-        generation_service.settle_task_failed(db, task.task_id, error_msg)
-        task.status = "failed"
-
-    return TaskCreateResponse(
+    # 构建响应数据
+    response_data = TaskCreateResponse(
         task_id=task.task_id,
         status=task.status,
-        frozen_points=task.frozen_points
+        frozen_points=task.frozen_points,
+        error_message=error_msg
+    )
+
+    return ApiResponse(
+        code=0 if success else 50001,
+        message="success" if success else error_msg,
+        data=response_data,
+        success=success
     )

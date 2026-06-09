@@ -11,7 +11,9 @@ import {
 } from '@ant-design/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { getModelPrices } from '@/api/modelPrice'
+import type { ModelPriceItem, ModelPriceListResult } from '@/api/modelPrice'
 import { createImageTask, getTaskDetail } from '@/api/generation'
+import type { TaskCreateResult, TaskDetailResult } from '@/api/generation'
 
 const userStore = useUserStore()
 const inputText = ref('')
@@ -31,26 +33,6 @@ const loadingDots = Array.from({ length: 144 }, (_, index) => ({
   delay: `${Math.random() * 1.8}s`,
   opacity: 0.2 + Math.random() * 0.8,
 })) as LoadingDot[]
-interface ModelPriceItem {
-  id: number
-  model_key: string
-  image_size: string
-  image_count: number
-}
-
-interface ModelPriceResponse {
-  items: ModelPriceItem[]
-}
-
-interface TaskCreateResult {
-  task_id: string
-  status: string
-  frozen_points: number
-}
-
-interface TaskDetailResult {
-  images?: string[]
-}
 
 function openImagePreview(image: string) {
   previewImage.value = image
@@ -111,7 +93,7 @@ async function handleSend() {
   generatedImages.value = []
   try {
     // 获取模型价格配置
-    const priceRes = (await getModelPrices('image')) as unknown as ModelPriceResponse
+    const priceRes = await getModelPrices('image')
     if (!priceRes.items || priceRes.items.length === 0) {
       message.error('暂无可用模型')
       return
@@ -133,18 +115,18 @@ async function handleSend() {
     }
 
     // 创建生图任务
-    const taskRes = (await createImageTask({
+    const taskRes = await createImageTask({
       price_config_id: priceConfig.id,
       prompt: inputText.value
-    })) as unknown as TaskCreateResult
+    })
 
     if (taskRes.status === 'success') {
-      const detail = (await getTaskDetail(taskRes.task_id)) as unknown as TaskDetailResult
+      const detail = await getTaskDetail(taskRes.task_id)
       generatedImages.value = detail.images || []
       message.success('图片生成成功！')
     } else if (taskRes.status === 'failed') {
       generatedImages.value = []
-      message.error('图片生成失败，积分已退回')
+      message.error(taskRes.error_message ? `图片生成失败，积分已退回：${taskRes.error_message}` : '图片生成失败，积分已退回')
     } else {
       generatedImages.value = []
       message.info('任务已提交，请稍后查看结果')
@@ -425,7 +407,8 @@ function handleCountMenu({ key }: { key: string | number }) {
 
 .chat-page.has-chat {
   justify-content: flex-start;
-  padding-bottom: 180px;
+  min-height: auto;
+  padding-bottom: 24px;
 }
 
 .main-greeting {
@@ -455,12 +438,12 @@ function handleCountMenu({ key }: { key: string | number }) {
   z-index: 1;
 }
 .chat-page.has-chat .input-card {
-  position: fixed;
-  left: 50%;
+  position: sticky;
   bottom: 24px;
-  transform: translateX(-50%);
-  width: min(800px, calc(100vw - 48px));
+  width: 100%;
+  max-width: 800px;
   z-index: 100;
+  margin-top: 24px;
 }
 
 [data-theme='dark'] .input-card {
@@ -644,6 +627,7 @@ function handleCountMenu({ key }: { key: string | number }) {
   width: 100%;
   max-width: 800px;
   margin-top: 20px;
+  margin-bottom: 24px;
   display: flex;
   flex-direction: column;
   gap: 18px;
