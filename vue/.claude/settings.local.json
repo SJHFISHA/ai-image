@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(timeout 10 npm run dev)",
+      "Bash(npx vue-tsc *)",
+      "Bash(node -e \"const m = require\\('@ant-design/icons-vue'\\); const names = Object.keys\\(m\\).filter\\(n => n.includes\\('Outlined'\\)\\).sort\\(\\); console.log\\(names.join\\('\\\\n'\\)\\)\")",
+      "Bash(node -e \"const m = require\\('@ant-design/icons-vue'\\); console.log\\('AimOutlined' in m, 'SendOutlined' in m, 'AtSignOutlined' in m\\)\")",
+      "Bash(timeout 8 npm run dev)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(node -e \"const icons = require\\('@ant-design/icons-vue'\\); const names = Object.keys\\(icons\\).filter\\(k => k.match\\(/At|User|Mail|Send/i\\)\\); console.log\\(names.join\\('\\\\n'\\)\\)\")"
+    ]
+  }
+}

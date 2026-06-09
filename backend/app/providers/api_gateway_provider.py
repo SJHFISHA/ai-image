@@ -1,0 +1,164 @@
+"""
+API中转站调用模块
+"""
+import httpx
+import warnings
+import urllib3
+from typing import Dict, Any, Optional
+
+from app.core.config import settings
+from app.providers.base import BaseProvider
+from app.utils.logger import app_logger
+
+# 忽略SSL警告
+warnings.filterwarnings('ignore', message='Unverified HTTPS request')
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+class ApiGatewayProvider(BaseProvider):
+    """API中转站调用实现"""
+
+    def __init__(self):
+        self.base_url = settings.API_GATEWAY_BASE_URL
+        self.api_key = settings.API_GATEWAY_API_KEY
+
+    def _get_headers(self) -> Dict[str, str]:
+        """获取请求头"""
+        return {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}"
+        }
+
+    def generate_image(
+        self,
+        model: str,
+        prompt: str,
+        size: str = "1024x1024",
+        count: int = 1,
+        quality: str = "low",
+        format: str = "jpeg",
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        调用API中转站生成图片
+
+        Args:
+            model: 模型标识，例如 gpt-image-2
+            prompt: 提示词
+            size: 图片尺寸，例如 1024x1024, 1024x1536, 1536x1024
+            count: 生成数量
+            quality: 图片质量 (low, medium, high, auto)
+            format: 图片格式 (jpeg, png)
+
+        Returns:
+            API返回的原始响应
+
+        Raises:
+            Exception: API调用失败时抛出异常
+        """
+        url = f"{self.base_url}/v1/images/generations"
+
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "n": count,
+            "size": size,
+            "quality": quality,
+            "format": format
+        }
+
+        # 合并额外参数
+        payload.update(kwargs)
+
+        app_logger.info(f"调用API中转站生图: model={model}, size={size}, count={count}")
+
+        try:
+            response = httpx.post(
+                url,
+                json=payload,
+                headers=self._get_headers(),
+                timeout=180.0,  # 3分钟超时
+                verify=False  # 禁用SSL验证
+            )
+
+            response.raise_for_status()
+            result = response.json()
+
+            app_logger.info(f"API中转站生图成功: model={model}")
+            return result
+
+        except httpx.HTTPStatusError as e:
+            error_msg = f"API调用失败: {e.response.status_code} - {e.response.text}"
+            app_logger.error(error_msg)
+            raise Exception(error_msg)
+
+        except httpx.RequestError as e:
+            error_msg = f"API请求错误: {str(e)}"
+            app_logger.error(error_msg)
+            raise Exception(error_msg)
+
+    def generate_video(
+        self,
+        model: str,
+        prompt: str,
+        duration: int = 5,
+        resolution: str = "720p",
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        调用API中转站生成视频
+
+        Args:
+            model: 模型标识
+            prompt: 提示词
+            duration: 视频时长（秒）
+            resolution: 视频分辨率
+
+        Returns:
+            API返回的原始响应
+
+        Raises:
+            Exception: API调用失败时抛出异常
+        """
+        url = f"{self.base_url}/v1/videos/generations"
+
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "duration": duration,
+            "resolution": resolution
+        }
+
+        # 合并额外参数
+        payload.update(kwargs)
+
+        app_logger.info(f"调用API中转站生视频: model={model}, duration={duration}, resolution={resolution}")
+
+        try:
+            response = httpx.post(
+                url,
+                json=payload,
+                headers=self._get_headers(),
+                timeout=300.0,  # 5分钟超时（视频生成较慢）
+                verify=False  # 禁用SSL验证
+            )
+
+            response.raise_for_status()
+            result = response.json()
+
+            app_logger.info(f"API中转站生视频成功: model={model}")
+            return result
+
+        except httpx.HTTPStatusError as e:
+            error_msg = f"API调用失败: {e.response.status_code} - {e.response.text}"
+            app_logger.error(error_msg)
+            raise Exception(error_msg)
+
+        except httpx.RequestError as e:
+            error_msg = f"API请求错误: {str(e)}"
+            app_logger.error(error_msg)
+            raise Exception(error_msg)
+
+
+# 全局供应商实例
+api_gateway_provider = ApiGatewayProvider()

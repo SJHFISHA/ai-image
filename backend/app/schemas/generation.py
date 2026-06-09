@@ -1,0 +1,48 @@
+"""
+生成任务相关请求和响应模型
+"""
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from datetime import datetime
+
+
+class ImageGenerateRequest(BaseModel):
+    """生图任务创建请求"""
+    price_config_id: int = Field(..., description="模型价格配置ID")
+    prompt: str = Field(..., min_length=1, max_length=2000, description="提示词")
+
+
+class TaskCreateResponse(BaseModel):
+    """任务创建成功响应"""
+    task_id: str = Field(..., description="任务ID")
+    status: str = Field(..., description="任务状态")
+    frozen_points: int = Field(..., description="冻结积分")
+
+
+class TaskDetailResponse(BaseModel):
+    """任务详情响应"""
+    task_id: str = Field(..., description="任务ID")
+    status: str = Field(..., description="任务状态")
+    model_key: str = Field(..., description="模型标识")
+    model_name: str = Field(..., description="模型名称")
+    capability_type: str = Field(..., description="能力类型")
+    image_size: Optional[str] = Field(None, description="图片尺寸")
+    image_count: Optional[int] = Field(None, description="图片数量")
+    prompt: Optional[str] = Field(None, description="提示词")
+    frozen_points: int = Field(..., description="冻结积分")
+    consumed_points: int = Field(..., description="消耗积分")
+    refunded_points: int = Field(..., description="退回积分")
+    error_message: Optional[str] = Field(None, description="错误信息")
+    images: Optional[List[str]] = Field(None, description="生成的图片URL列表")
+    created_at: datetime = Field(..., description="创建时间")
+    finished_at: Optional[datetime] = Field(None, description="完成时间")
+
+    class Config:
+        from_attributes = True
+        protected_namespaces = ()
+
+
+class TaskListResponse(BaseModel):
+    """任务列表响应"""
+    total: int = Field(..., description="总数")
+    items: list[TaskDetailResponse] = Field(..., description="任务列表")
