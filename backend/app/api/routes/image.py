@@ -17,6 +17,76 @@ from app.utils.logger import app_logger
 
 router = APIRouter(prefix="/image", tags=["生图"])
 
+def normalize_image_value(value: str) -> str:
+    """
+    统一图片返回格式。
+    URL 直接返回，base64 自动补 data:image/png;base64, 前缀，方便前端 img 直接显示。
+    """
+    if value.startswith("http://") or value.startswith("https://"):
+        return value
+
+    if value.startswith("data:image/"):
+        return value
+
+    return f"data:image/png;base64,{value}"
+
+
+def extract_images_from_api_result(api_result) -> list[str]:
+    """
+    从 API 中转站返回结果中提取图片 URL 或 base64。
+    兼容 data 列表、data 对象、顶层 b64_json、顶层 images、纯字符串等格式。
+    """
+    images = []
+
+    if isinstance(api_result, str):
+        images.append(normalize_image_value(api_result))
+        return images
+
+    if not isinstance(api_result, dict):
+        return images
+
+    data = api_result.get("data")
+
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict):
+                for key in ("url", "b64_json", "image_url", "image"):
+                    value = item.get(key)
+                    if value:
+                        images.append(normalize_image_value(value))
+                        break
+            elif isinstance(item, str):
+                images.append(normalize_image_value(item))
+
+    elif isinstance(data, dict):
+        for key in ("url", "b64_json", "image_url", "image"):
+            value = data.get(key)
+            if value:
+                images.append(normalize_image_value(value))
+
+        data_images = data.get("images")
+        if isinstance(data_images, list):
+            images.extend([
+                normalize_image_value(item)
+                for item in data_images
+                if isinstance(item, str)
+            ])
+
+    for key in ("url", "b64_json", "image_url", "image"):
+        value = api_result.get(key)
+        if value:
+            images.append(normalize_image_value(value))
+
+    top_images = api_result.get("images")
+    if isinstance(top_images, list):
+        images.extend([
+            normalize_image_value(item)
+            for item in top_images
+            if isinstance(item, str)
+        ])
+
+    return images
+
 
 @router.post("/generate", response_model=TaskCreateResponse, summary="创建生图任务")
 def create_image_task(
@@ -65,18 +135,11 @@ def create_image_task(
             format="jpeg"
         )
 
-        # 解析返回结果，提取图片 URL
-        images = []
-        if "data" in api_result:
-            for item in api_result["data"]:
-                if "url" in item:
-                    images.append(item["url"])
-                elif "b64_json" in item:
-                    # 如果返回的是 base64，需要保存到文件或返回 base64
-                    images.append(item["b64_json"])
+        # 解析返回结果，提取图片 URL 或 base64
+        images = extract_images_from_api_result(api_result)
 
         if not images:
-            raise Exception("API未返回图片数据")
+            raise Exception(f"API未返回图片数据，原始返回: {api_result}")
 
         # 构建结果
         result = {"images": images}
