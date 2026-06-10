@@ -39,6 +39,14 @@
           <template #icon><SwapOutlined /></template>
           <span>积分流水</span>
         </a-menu-item>
+        <a-menu-item key="/admin/users">
+          <template #icon><TeamOutlined /></template>
+          <span>用户管理</span>
+        </a-menu-item>
+        <a-menu-item key="/admin/tasks">
+          <template #icon><ThunderboltOutlined /></template>
+          <span>任务管理</span>
+        </a-menu-item>
       </a-menu>
 
       <!-- 底部管理员信息 -->
@@ -104,6 +112,8 @@ import {
   UserOutlined,
   BulbOutlined,
   BulbFilled,
+  TeamOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons-vue'
 
 const route = useRoute()

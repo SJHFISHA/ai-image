@@ -6,6 +6,7 @@ from typing import Optional
 
 from sqlalchemy import String, BigInteger, Integer, DateTime, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column
+from app.utils.timezone import now_beijing_naive
 
 from app.db.base import Base
 
@@ -50,7 +51,7 @@ class GenerationTask(Base):
 
     error_message: Mapped[Optional[str]] = mapped_column(Text, comment="错误信息")
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, comment="创建时间")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_beijing_naive, comment="创建时间")
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, comment="开始执行时间")
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, comment="完成时间")
 

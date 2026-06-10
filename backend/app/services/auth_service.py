@@ -3,6 +3,7 @@
 """
 from typing import Optional
 from datetime import datetime
+from app.utils.timezone import now_beijing_naive
 
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
@@ -145,7 +146,7 @@ def login_user(
         )
 
     # 更新最后登录时间
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = now_beijing_naive()
     db.commit()
 
     # 生成JWT token

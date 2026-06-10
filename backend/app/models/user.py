@@ -8,6 +8,7 @@ from sqlalchemy import String, DateTime, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.utils.timezone import now_beijing_naive
 
 
 class User(Base):
@@ -31,11 +32,11 @@ class User(Base):
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime, comment="最后登录时间")
     last_login_ip: Mapped[Optional[str]] = mapped_column(String(64), comment="最后登录IP")
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, comment="创建时间")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_beijing_naive, comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=now_beijing_naive,
+        onupdate=now_beijing_naive,
         comment="更新时间"
     )
 

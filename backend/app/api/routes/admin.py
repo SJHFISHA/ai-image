@@ -30,6 +30,11 @@ from app.schemas.admin import (
     AdminPointAdjustRequest,
     PointTransactionDetailResponse,
     PointTransactionListResponse,
+    AdminUserDetailResponse,
+    AdminUserListResponse,
+    AdminUserStatusUpdateRequest,
+    AdminTaskDetailResponse,
+    AdminTaskListResponse,
 )
 from app.services import admin_service
 
@@ -344,4 +349,75 @@ def get_point_transactions(
 
     items = [PointTransactionDetailResponse(**item) for item in result["items"]]
     response_data = PointTransactionListResponse(total=result["total"], items=items)
+    return ApiResponse(data=response_data)
+
+
+# ======================== 用户管理 ========================
+
+@router.get("/users", response_model=ApiResponse[AdminUserListResponse], summary="查询用户列表")
+def get_users(
+    keyword: Optional[str] = Query(None, description="搜索关键词（用户名/昵称）"),
+    status: Optional[str] = Query(None, description="状态筛选: normal, disabled"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    current_admin: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """查询用户列表"""
+    result = admin_service.get_user_list(
+        db=db,
+        keyword=keyword,
+        status_filter=status,
+        page=page,
+        page_size=page_size
+    )
+
+    items = [AdminUserDetailResponse.model_validate(item) for item in result["items"]]
+    response_data = AdminUserListResponse(total=result["total"], items=items)
+    return ApiResponse(data=response_data)
+
+
+@router.put("/users/{user_id}/status", response_model=ApiResponse[AdminUserDetailResponse], summary="更新用户状态")
+def update_user_status(
+    user_id: int,
+    request: AdminUserStatusUpdateRequest,
+    current_admin: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """更新用户状态（启用/禁用）"""
+    user = admin_service.update_user_status(
+        db=db,
+        user_id=user_id,
+        new_status=request.status
+    )
+    response_data = AdminUserDetailResponse.model_validate(user)
+    return ApiResponse(code=0, message="更新成功", data=response_data)
+
+
+# ======================== 生成任务管理 ========================
+
+@router.get("/tasks", response_model=ApiResponse[AdminTaskListResponse], summary="查询生成任务列表")
+def get_generation_tasks(
+    user_id: Optional[int] = Query(None, description="用户ID筛选"),
+    status: Optional[str] = Query(None, description="任务状态筛选"),
+    task_id: Optional[str] = Query(None, description="任务ID搜索"),
+    keyword: Optional[str] = Query(None, description="关键词搜索（任务ID/模型/提示词）"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    current_admin: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """查询生成任务列表"""
+    result = admin_service.get_generation_task_list(
+        db=db,
+        user_id=user_id,
+        task_status=status,
+        task_id=task_id,
+        keyword=keyword,
+        page=page,
+        page_size=page_size
+    )
+
+    items = [AdminTaskDetailResponse(**item) for item in result["items"]]
+    response_data = AdminTaskListResponse(total=result["total"], items=items)
     return ApiResponse(data=response_data)

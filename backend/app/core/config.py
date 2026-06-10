@@ -19,8 +19,17 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 10080  # 7天
 
     # API 中转站配置
-    API_GATEWAY_BASE_URL: str = "https://api.jiguangmanying.xyz"
-    API_GATEWAY_API_KEY: str = "sk-snlLf4MDR3pC9XvBBeGKnWfaX2Rkwh1DmNU4S5Zw6VdMSQMC"
+    API_GATEWAY_BASE_URL: str = ""
+    API_GATEWAY_API_KEY: str = ""
+
+    # 七牛云对象存储配置
+    QINIU_ACCESS_KEY: str = ""
+    QINIU_SECRET_KEY: str = ""
+    QINIU_BUCKET: str = ""
+    QINIU_DOMAIN: str = ""
+    QINIU_REGION_ID: str = ""
+    QINIU_PRIVATE_BUCKET: bool = False
+    QINIU_PRIVATE_URL_EXPIRES: int = 3600
 
     # 项目配置
     APP_NAME: str = "AI创作平台"
@@ -34,4 +43,3 @@ class Settings(BaseSettings):
 
 # 全局配置实例
 settings = Settings()
-print(f"[DEBUG] API_GATEWAY_BASE_URL = {settings.API_GATEWAY_BASE_URL}")

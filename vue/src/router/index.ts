@@ -17,8 +17,30 @@ const router = createRouter({
     },
     {
       path: '/',
-      name: 'home',
+      redirect: '/image-generate',
+    },
+    {
+      path: '/dashboard',
+      name: 'dashboard',
+      component: () => import('@/views/DashboardView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/image-generate',
+      name: 'image-generate',
       component: () => import('@/views/HomeView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/points/logs',
+      name: 'point-logs',
+      component: () => import('@/views/PointLogsView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/tasks',
+      name: 'tasks',
+      component: () => import('@/views/TaskListView.vue'),
       meta: { requiresAuth: true }
     },
     // ======================== 管理员路由 ========================
@@ -59,6 +81,16 @@ const router = createRouter({
           path: 'point-transactions',
           name: 'admin-point-transactions',
           component: () => import('@/views/admin/PointTransactionView.vue')
+        },
+        {
+          path: 'users',
+          name: 'admin-users',
+          component: () => import('@/views/admin/UserView.vue')
+        },
+        {
+          path: 'tasks',
+          name: 'admin-tasks',
+          component: () => import('@/views/admin/GenerationTaskView.vue')
         }
       ]
     }

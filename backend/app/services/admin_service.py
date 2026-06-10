@@ -3,6 +3,7 @@
 """
 from typing import Optional
 from datetime import datetime
+from app.utils.timezone import now_beijing_naive
 
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
@@ -46,7 +47,7 @@ def admin_login(db: Session, username: str, password: str) -> dict:
         )
 
     # 更新最后登录时间
-    admin.last_login_at = datetime.utcnow()
+    admin.last_login_at = now_beijing_naive()
     db.commit()
 
     # 生成管理员JWT token
@@ -124,7 +125,7 @@ def update_model_price_config(db: Session, config_id: int, data: dict) -> ModelP
         if value is not None:
             setattr(config, key, value)
 
-    config.updated_at = datetime.utcnow()
+    config.updated_at = now_beijing_naive()
     db.commit()
     db.refresh(config)
 
@@ -197,7 +198,7 @@ def update_recharge_package(db: Session, package_id: int, data: dict) -> Recharg
         if value is not None:
             setattr(package, key, value)
 
-    package.updated_at = datetime.utcnow()
+    package.updated_at = now_beijing_naive()
     db.commit()
     db.refresh(package)
 
@@ -266,9 +267,9 @@ def update_recharge_order_status(db: Session, order_id: int, pay_status: str) ->
 
     order.pay_status = pay_status
     if pay_status == "paid" and not order.paid_at:
-        order.paid_at = datetime.utcnow()
+        order.paid_at = now_beijing_naive()
 
-    order.updated_at = datetime.utcnow()
+    order.updated_at = now_beijing_naive()
     db.commit()
     db.refresh(order)
 
@@ -372,7 +373,7 @@ def admin_adjust_points(
         else:
             account.balance_points += points
 
-        account.updated_at = datetime.utcnow()
+        account.updated_at = now_beijing_naive()
 
         # 创建流水记录
         transaction_no = generate_transaction_no("ADJ")
@@ -449,6 +450,134 @@ def get_point_transaction_list(
             "related_task_id": transaction.related_task_id,
             "remark": transaction.remark,
             "created_at": transaction.created_at
+        })
+
+    return {"total": total, "items": items}
+
+
+# ======================== 用户管理 ========================
+
+def get_user_list(
+    db: Session,
+    keyword: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20
+) -> dict:
+    """查询用户列表"""
+    from app.models.user import User
+
+    query = db.query(User)
+
+    if keyword:
+        query = query.filter(
+            User.username.contains(keyword) |
+            User.nickname.contains(keyword)
+        )
+    if status_filter:
+        query = query.filter(User.status == status_filter)
+
+    total = query.count()
+    users = query.order_by(User.id.desc()).offset(
+        (page - 1) * page_size
+    ).limit(page_size).all()
+
+    return {"total": total, "items": users}
+
+
+def update_user_status(db: Session, user_id: int, new_status: str) -> "User":
+    """
+    更新用户状态（启用/禁用）
+
+    第一版只做启用/禁用，不做删除用户，避免破坏历史数据。
+    """
+    from app.models.user import User
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="用户不存在"
+        )
+
+    valid_statuses = ["normal", "disabled"]
+    if new_status not in valid_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"无效的状态值，允许: {', '.join(valid_statuses)}"
+        )
+
+    user.status = new_status
+    user.updated_at = now_beijing_naive()
+    db.commit()
+    db.refresh(user)
+
+    app_logger.info(f"更新用户状态: user_id={user_id}, status={new_status}")
+    return user
+
+
+# ======================== 生成任务管理 ========================
+
+def get_generation_task_list(
+    db: Session,
+    user_id: Optional[int] = None,
+    task_status: Optional[str] = None,
+    task_id: Optional[str] = None,
+    keyword: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20
+) -> dict:
+    """查询生成任务列表（关联用户名）"""
+    from app.models.generation_task import GenerationTask
+    from app.models.user import User
+
+    query = db.query(
+        GenerationTask,
+        User.username
+    ).outerjoin(User, GenerationTask.user_id == User.id)
+
+    if user_id is not None:
+        query = query.filter(GenerationTask.user_id == user_id)
+    if task_status:
+        query = query.filter(GenerationTask.status == task_status)
+    if task_id:
+        query = query.filter(GenerationTask.task_id == task_id)
+    if keyword:
+        query = query.filter(
+            GenerationTask.task_id.contains(keyword) |
+            GenerationTask.model_key.contains(keyword) |
+            GenerationTask.prompt.contains(keyword)
+        )
+
+    total = query.count()
+    rows = query.order_by(
+        GenerationTask.id.desc()
+    ).offset((page - 1) * page_size).limit(page_size).all()
+
+    items = []
+    for task, username in rows:
+        items.append({
+            "id": task.id,
+            "task_id": task.task_id,
+            "user_id": task.user_id,
+            "username": username,
+            "price_config_id": task.price_config_id,
+            "model_key": task.model_key,
+            "model_name": task.model_name,
+            "capability_type": task.capability_type,
+            "image_size": task.image_size,
+            "image_count": task.image_count,
+            "status": task.status,
+            "frozen_points": task.frozen_points,
+            "consumed_points": task.consumed_points,
+            "refunded_points": task.refunded_points,
+            "prompt": task.prompt,
+            "error_message": task.error_message,
+            "request_json": task.request_json,
+            "provider_response_json": task.provider_response_json,
+            "created_at": task.created_at,
+            "started_at": task.started_at,
+            "finished_at": task.finished_at
         })
 
     return {"total": total, "items": items}

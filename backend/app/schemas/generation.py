@@ -8,6 +8,7 @@ from datetime import datetime
 
 class ImageGenerateRequest(BaseModel):
     """生图任务创建请求"""
+    session_id: Optional[str] = Field(None, description="会话ID，不传则自动创建新会话")
     price_config_id: int = Field(..., description="模型价格配置ID")
     prompt: str = Field(..., min_length=1, max_length=2000, description="提示词")
 
@@ -18,6 +19,7 @@ class TaskCreateResponse(BaseModel):
     status: str = Field(..., description="任务状态")
     frozen_points: int = Field(..., description="冻结积分")
     error_message: Optional[str] = Field(None, description="错误信息，仅在任务创建失败时返回")
+    session_id: Optional[str] = Field(None, description="会话ID")
 
 
 class TaskDetailResponse(BaseModel):

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ConfigProvider, Layout, Menu, Dropdown, Tooltip } from 'ant-design-vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { getConversationList } from '@/api/conversation'
+import type { ConversationItem } from '@/api/conversation'
 import {
   EditOutlined,
   MessageOutlined,
@@ -18,12 +20,42 @@ import {
   AppstoreOutlined,
   BellOutlined,
   MobileOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons-vue'
 import type { MenuTheme } from 'ant-design-vue'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+
+// 历史会话列表
+const historySessions = ref<ConversationItem[]>([])
+const historyLoading = ref(false)
+
+async function loadHistory() {
+  if (!userStore.isLoggedIn) {
+    historySessions.value = []
+    return
+  }
+  historyLoading.value = true
+  try {
+    const res = await getConversationList({ page: 1, page_size: 20 })
+    historySessions.value = res.items || []
+  } catch {
+    historySessions.value = []
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+function openSession(session: ConversationItem) {
+  router.push({ path: '/image-generate', query: { session_id: session.session_id } })
+}
+
+function handleNewChat() {
+  selectedKeys.value = ['new-chat']
+  router.push('/image-generate')
+}
 
 // 判断是否为登录/注册页或管理员页面，这些页面不显示用户侧边栏
 const isAuthPage = computed(() => {
@@ -39,13 +71,29 @@ const isDark = ref(false)
 const collapsed = ref(false)
 const selectedKeys = ref<string[]>(['new-chat'])
 const primaryNavItems = [
-  { key: 'inspiration', label: '灵感', icon: HomeOutlined },
-  { key: 'generate', label: '生成', icon: AppstoreOutlined },
-  { key: 'assets', label: '资产', icon: FolderOutlined },
-  { key: 'canvas', label: '画布', icon: AppstoreOutlined },
+  { key: 'dashboard', label: '用户中心', icon: UserOutlined, path: '/dashboard' },
+  { key: 'generate', label: '生成', icon: AppstoreOutlined, path: '/image-generate' },
+  { key: 'tasks', label: '任务', icon: FolderOutlined, path: '/tasks' },
+  { key: 'points', label: '积分', icon: EditOutlined, path: '/points/logs' },
 ]
 
 const selectedPrimaryKey = ref('generate')
+
+function handlePrimaryNavClick(key: string) {
+  selectedPrimaryKey.value = key
+  const item = primaryNavItems.find(i => i.key === key)
+  if (item?.path) {
+    router.push(item.path)
+  }
+}
+
+// 根据当前路由同步侧边栏高亮
+watch(() => route.path, (path) => {
+  const matched = primaryNavItems.find(item => item.path && path.startsWith(item.path))
+  if (matched) {
+    selectedPrimaryKey.value = matched.key
+  }
+}, { immediate: true })
 
 const siderTheme = computed<MenuTheme>(() => (isDark.value ? 'dark' : 'light'))
 
@@ -93,6 +141,22 @@ function handleLogout() {
 onMounted(async () => {
   if (userStore.isLoggedIn) {
     await userStore.init()
+    await loadHistory()
+  }
+  // 监听生图完成事件，刷新历史列表
+  window.addEventListener('history-refresh', loadHistory)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('history-refresh', loadHistory)
+})
+
+// 登录状态变化时重新加载历史
+watch(() => userStore.isLoggedIn, (loggedIn) => {
+  if (loggedIn) {
+    loadHistory()
+  } else {
+    historySessions.value = []
   }
 })
 </script>
@@ -133,7 +197,7 @@ onMounted(async () => {
                     class="primary-nav-item"
                     :class="{ active: selectedPrimaryKey === item.key }"
                     type="button"
-                    @click="selectedPrimaryKey = item.key"
+                    @click="handlePrimaryNavClick(item.key)"
                   >
                     <component :is="item.icon" class="primary-nav-icon" />
                     <span>{{ item.label }}</span>
@@ -170,7 +234,7 @@ onMounted(async () => {
                             <PictureOutlined />
                             更换头像
                           </Menu.Item>
-                          <Menu.Item @click="router.push('/')">
+                          <Menu.Item @click="router.push('/dashboard')">
                             <UserOutlined />
                             用户中心
                           </Menu.Item>
@@ -202,7 +266,7 @@ onMounted(async () => {
 
               <aside class="secondary-sidebar" :class="{ collapsed }">
                 <div class="secondary-header">
-                  <button class="quick-new-chat-btn" type="button" @click="selectedKeys = ['new-chat']">
+                  <button class="quick-new-chat-btn" type="button" @click="handleNewChat">
                     新对话
                   </button>
 
@@ -228,19 +292,23 @@ onMounted(async () => {
                       </template>
                       新对话
                     </Menu.Item>
-                    <Menu.Item key="default-create">
-                      <template #icon>
-                        <MessageOutlined />
-                      </template>
-                      默认创作
-                    </Menu.Item>
                   </Menu>
 
                   <div class="recent-section">
-                    <div class="recent-title">最近</div>
-                    <button class="recent-item" type="button">
-                      <span class="recent-thumb"></span>
-                      <span class="recent-text">未来机甲战士都市废墟</span>
+                    <div class="recent-title">历史记录</div>
+                    <div v-if="historyLoading" class="history-loading">加载中...</div>
+                    <div v-else-if="historySessions.length === 0" class="history-empty">暂无历史记录</div>
+                    <button
+                      v-for="session in historySessions"
+                      :key="session.session_id"
+                      class="recent-item"
+                      type="button"
+                      @click="openSession(session)"
+                    >
+                      <ClockCircleOutlined class="recent-icon" />
+                      <span class="recent-text" :title="session.title || session.last_message_preview">
+                        {{ session.title || session.last_message_preview || '未命名会话' }}
+                      </span>
                     </button>
                   </div>
                 </template>
@@ -556,6 +624,19 @@ onMounted(async () => {
   border-radius: 8px;
   flex-shrink: 0;
   background: linear-gradient(135deg, #1d3557, #52b6ff);
+}
+
+.recent-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.history-loading,
+.history-empty {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.35);
+  padding: 8px 0;
 }
 
 .recent-text {

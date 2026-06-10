@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import {
   PlusOutlined,
@@ -11,17 +12,49 @@ import {
 } from '@ant-design/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { getModelPrices } from '@/api/modelPrice'
-import type { ModelPriceItem, ModelPriceListResult } from '@/api/modelPrice'
+import type { ModelPriceItem } from '@/api/modelPrice'
 import { createImageTask, getTaskDetail } from '@/api/generation'
 import type { TaskCreateResult, TaskDetailResult } from '@/api/generation'
+import { getConversationDetail } from '@/api/conversation'
+import type { ConversationMessage } from '@/api/conversation'
 
 const userStore = useUserStore()
+const route = useRoute()
+const router = useRouter()
+const currentSessionId = ref<string | null>(null)
+const historyMessages = ref<ConversationMessage[]>([])
 const inputText = ref('')
 const sending = ref(false)
 const generatedImages = ref<string[]>([])
 const previewImage = ref('')
 const currentPrompt = ref('')
 const promptExpanded = ref(false)
+const pollTimer = ref<ReturnType<typeof setInterval> | undefined>(undefined)
+const isCreatingSession = ref(false)
+
+// 监听路由 query 变化，加载会话历史
+watch(() => route.query.session_id, async (sid) => {
+  // 如果是创建流程中 router.replace 触发的，只同步 sessionId，不加载历史
+  if (isCreatingSession.value) {
+    currentSessionId.value = sid ? String(sid) : null
+    return
+  }
+
+  currentSessionId.value = sid ? String(sid) : null
+  generatedImages.value = []
+  currentPrompt.value = ''
+  historyMessages.value = []
+
+  // 如果有 session_id，加载历史消息（只用 historyMessages 渲染，不设置 generatedImages/currentPrompt）
+  if (currentSessionId.value) {
+    try {
+      const detail = await getConversationDetail(currentSessionId.value)
+      historyMessages.value = detail.messages || []
+    } catch {
+      // 静默处理
+    }
+  }
+}, { immediate: true })
 interface LoadingDot {
   id: number
   delay: string
@@ -87,49 +120,50 @@ async function handleSend() {
 
   if (sending.value) return
 
+  // 检查是否已选择有效配置
+  if (!selectedPriceConfig.value) {
+    message.error('当前模型/分辨率/数量组合不可用，请重新选择')
+    return
+  }
+
   sending.value = true
   currentPrompt.value = inputText.value.trim()
   promptExpanded.value = false
   generatedImages.value = []
+
   try {
-    // 获取模型价格配置
-    const priceRes = await getModelPrices('image')
-    if (!priceRes.items || priceRes.items.length === 0) {
-      message.error('暂无可用模型')
-      return
-    }
-
-    // 使用第一个可用的配置
-    // 根据当前选择的模型、分辨率、图片数量匹配价格配置
-    const priceConfig = priceRes.items.find((item) => {
-      return (
-        item.model_key === selectedModel.value &&
-        item.image_size === selectedResolution.value &&
-        Number(item.image_count) === Number(selectedCount.value)
-      )
-    })
-
-    if (!priceConfig) {
-      message.error(`当前模型不支持 ${selectedResolution.value} / ${selectedCount.value} 张，请重新选择`)
-      return
-    }
-
     // 创建生图任务
     const taskRes = await createImageTask({
-      price_config_id: priceConfig.id,
+      session_id: currentSessionId.value || undefined,
+      price_config_id: selectedPriceConfig.value.id,
       prompt: inputText.value
     })
 
+    // 如果后端创建了新会话，更新当前 session_id 并同步 URL
+    if (!currentSessionId.value && taskRes.session_id) {
+      currentSessionId.value = taskRes.session_id
+      isCreatingSession.value = true
+      await router.replace({ path: '/image-generate', query: { session_id: taskRes.session_id } })
+    }
+
+    // 如果任务已经完成（同步返回成功或失败）
     if (taskRes.status === 'success') {
       const detail = await getTaskDetail(taskRes.task_id)
       generatedImages.value = detail.images || []
       message.success('图片生成成功！')
+      await userStore.fetchUserInfo()
+      window.dispatchEvent(new Event('history-refresh'))
+      sending.value = false
     } else if (taskRes.status === 'failed') {
       generatedImages.value = []
       message.error(taskRes.error_message ? `图片生成失败，积分已退回：${taskRes.error_message}` : '图片生成失败，积分已退回')
+      await userStore.fetchUserInfo()
+      window.dispatchEvent(new Event('history-refresh'))
+      sending.value = false
     } else {
-      generatedImages.value = []
-      message.info('任务已提交，请稍后查看结果')
+      // 异步任务，开始轮询
+      message.info('任务已提交，正在生成中...')
+      startPolling(taskRes.task_id)
     }
 
     inputText.value = ''
@@ -137,21 +171,55 @@ async function handleSend() {
     const errorMessage =
       error &&
       typeof error === 'object' &&
-      'response' in error &&
-      error.response &&
-      typeof error.response === 'object' &&
-      'data' in error.response &&
-      error.response.data &&
-      typeof error.response.data === 'object' &&
-      'detail' in error.response.data
-        ? String(error.response.data.detail)
+      'message' in error
+        ? String(error.message)
         : '发送失败'
 
     message.error(errorMessage)
-  } finally {
     sending.value = false
+  } finally {
+    isCreatingSession.value = false
   }
 }
+
+// ======================== 轮询逻辑 ========================
+function startPolling(taskId: string) {
+  clearPolling()
+  pollTimer.value = setInterval(async () => {
+    try {
+      const detail = await getTaskDetail(taskId)
+      if (detail.status === 'success') {
+        generatedImages.value = detail.images || []
+        message.success('图片生成成功！')
+        await userStore.fetchUserInfo()
+        window.dispatchEvent(new Event('history-refresh'))
+        clearPolling()
+        sending.value = false
+      } else if (detail.status === 'failed') {
+        generatedImages.value = []
+        message.error(detail.error_message ? `图片生成失败，积分已退回：${detail.error_message}` : '图片生成失败，积分已退回')
+        await userStore.fetchUserInfo()
+        window.dispatchEvent(new Event('history-refresh'))
+        clearPolling()
+        sending.value = false
+      }
+      // running 或 pending 状态继续轮询
+    } catch {
+      // 单次查询失败不终止轮询
+    }
+  }, 2000)
+}
+
+function clearPolling() {
+  if (pollTimer.value) {
+    clearInterval(pollTimer.value)
+    pollTimer.value = undefined
+  }
+}
+
+onUnmounted(() => {
+  clearPolling()
+})
 
 function handleKeyDown(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -174,42 +242,88 @@ function handleAgentModeMenu({ key }: { key: string | number }) {
   agentModeOpen.value = false
 }
 
-// 模型选择
-const modelItems = [
-  { key: 'gpt-image-2', label: 'gpt-image-2' },
-]
-const selectedModel = ref('gpt-image-2')
+// ======================== 后端动态配置 ========================
+const priceConfigs = ref<ModelPriceItem[]>([])
+
+// 从配置中派生模型列表（去重）
+const modelItems = computed(() => {
+  const map = new Map<string, string>()
+  priceConfigs.value.forEach(item => map.set(item.model_key, item.model_name))
+  return Array.from(map.entries()).map(([key, label]) => ({ key, label }))
+})
+
+const selectedModel = ref('')
 const modelOpen = ref(false)
 function handleModelMenu({ key }: { key: string | number }) {
   selectedModel.value = key as string
+  // 切换模型后重置分辨率和数量
+  selectedResolution.value = availableResolutions.value[0] || ''
+  selectedCount.value = String(availableCounts.value[0] || 1)
   modelOpen.value = false
 }
 
-// 图片分辨率
-const resolutionItems = [
-  '1024x1024',
-  '1536x1024',
-  '1024x1536',
-  '2048x2048',
-  '2048x1152',
-  '3840x2160',
-  '2160x3840',
-]
-const selectedResolution = ref('1024x1024')
+// 根据当前模型联动可用分辨率
+const availableResolutions = computed(() => {
+  const sizes = priceConfigs.value
+    .filter(item => item.model_key === selectedModel.value)
+    .map(item => item.image_size)
+    .filter((s): s is string => !!s)
+  return [...new Set(sizes)]
+})
+
+const selectedResolution = ref('')
 const resolutionOpen = ref(false)
 function handleResolutionMenu({ key }: { key: string | number }) {
   selectedResolution.value = key as string
+  selectedCount.value = String(availableCounts.value[0] || 1)
   resolutionOpen.value = false
 }
 
-// 图片数量
-const countItems = Array.from({ length: 10 }, (_, i) => ({ key: String(i + 1), label: String(i + 1) }))
+// 根据当前模型和分辨率联动可用数量
+const availableCounts = computed(() => {
+  const counts = priceConfigs.value
+    .filter(item => item.model_key === selectedModel.value && item.image_size === selectedResolution.value)
+    .map(item => item.image_count)
+    .filter((c): c is number => !!c)
+  return [...new Set(counts)].sort((a, b) => a - b)
+})
+
 const selectedCount = ref('1')
 const countOpen = ref(false)
 function handleCountMenu({ key }: { key: string | number }) {
   selectedCount.value = key as string
   countOpen.value = false
 }
+
+// 当前选中的价格配置
+const selectedPriceConfig = computed(() =>
+  priceConfigs.value.find(item =>
+    item.model_key === selectedModel.value &&
+    item.image_size === selectedResolution.value &&
+    Number(item.image_count) === Number(selectedCount.value)
+  )
+)
+
+// 加载模型价格配置
+async function loadModelPrices() {
+  try {
+    const res = await getModelPrices('image')
+    priceConfigs.value = res.items || []
+    // 默认选中第一个
+    const first = priceConfigs.value.at(0)
+    if (first) {
+      selectedModel.value = first.model_key
+      selectedResolution.value = first.image_size || ''
+      selectedCount.value = String(first.image_count || 1)
+    }
+  } catch {
+    // 静默处理
+  }
+}
+
+onMounted(() => {
+  loadModelPrices()
+})
 </script>
 
 <template>
@@ -218,7 +332,42 @@ function handleCountMenu({ key }: { key: string | number }) {
       你好，想创作什么？
     </h1>
 
-    <div v-if="currentPrompt || sending || generatedImages.length" class="chat-thread">
+    <div v-if="currentPrompt || sending || generatedImages.length || historyMessages.length" class="chat-thread">
+      <!-- 历史消息渲染 -->
+      <template v-for="msg in historyMessages" :key="msg.message_id">
+        <div v-if="msg.role === 'user'" class="user-row">
+          <div class="user-bubble-wrap">
+            <div class="user-bubble">
+              {{ msg.content_text }}
+            </div>
+          </div>
+        </div>
+        <div v-else-if="msg.role === 'assistant'" class="assistant-row">
+          <div v-if="msg.content_type === 'image' && msg.status === 'success' && msg.assets?.length" class="image-result-card">
+            <div v-for="asset in msg.assets" :key="asset.asset_id" class="image-thumb-wrap">
+              <button class="image-thumb-btn" type="button" @click="openImagePreview(asset.url)">
+                <img :src="asset.url" class="chat-result-image" alt="历史图片" />
+              </button>
+              <button class="image-download-btn" type="button" title="下载" @click.stop="downloadImage(asset.url)">
+                <DownloadOutlined />
+              </button>
+            </div>
+          </div>
+          <div v-else-if="msg.content_type === 'image' && msg.status === 'running'" class="generation-card">
+            <div class="generation-title">正在生成图片...</div>
+          </div>
+          <div v-else-if="msg.content_type === 'image' && msg.status === 'failed'" class="generation-card" style="color: #ff4d4f;">
+            <div class="generation-title">图片生成失败</div>
+            <div>{{ msg.content_text }}</div>
+          </div>
+          <div v-else-if="msg.content_type === 'text'" class="user-bubble-wrap" style="align-items: flex-start;">
+            <div class="user-bubble" style="background: #f2f3f5;">
+              {{ msg.content_text }}
+            </div>
+          </div>
+        </div>
+      </template>
+
       <div v-if="currentPrompt" class="user-row">
         <div class="user-bubble-wrap">
           <div class="user-bubble" :class="{ expanded: promptExpanded }">
@@ -349,7 +498,7 @@ function handleCountMenu({ key }: { key: string | number }) {
           </button>
           <template #overlay>
             <a-menu>
-              <a-menu-item v-for="item in resolutionItems" :key="item" @click="handleResolutionMenu({ key: item })">
+              <a-menu-item v-for="item in availableResolutions" :key="item" @click="handleResolutionMenu({ key: item })">
                 {{ item }}
               </a-menu-item>
             </a-menu>
@@ -362,12 +511,16 @@ function handleCountMenu({ key }: { key: string | number }) {
           </button>
           <template #overlay>
             <a-menu>
-              <a-menu-item v-for="item in countItems" :key="item.key" @click="handleCountMenu({ key: item.key })">
-                {{ item.label }}
+              <a-menu-item v-for="item in availableCounts" :key="item" @click="handleCountMenu({ key: item })">
+                {{ item }}
               </a-menu-item>
             </a-menu>
           </template>
         </a-dropdown>
+
+        <span v-if="selectedPriceConfig" class="toolbar-points">
+          ✦ {{ selectedPriceConfig.points }} 积分
+        </span>
 
         <span class="toolbar-spacer"></span>
 
@@ -569,6 +722,13 @@ function handleCountMenu({ key }: { key: string | number }) {
 
 .toolbar-spacer {
   flex: 1;
+}
+
+.toolbar-points {
+  font-size: 12px;
+  color: #1677ff;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .send-btn {

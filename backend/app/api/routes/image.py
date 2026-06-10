@@ -1,7 +1,7 @@
 """
 生图相关路由
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -12,7 +12,7 @@ from app.schemas.generation import (
     TaskCreateResponse
 )
 from app.schemas.common import ApiResponse
-from app.services import generation_service
+from app.services import generation_service, conversation_service
 from app.utils.logger import app_logger
 
 router = APIRouter(prefix="/image", tags=["生图"])
@@ -91,51 +91,105 @@ def extract_images_from_api_result(api_result) -> list[str]:
 @router.post("/generate", response_model=ApiResponse[TaskCreateResponse], summary="创建生图任务")
 def create_image_task(
     request: ImageGenerateRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    创建生图任务
+    创建生图任务（异步执行）
 
+    - session_id: 可选会话ID，不传则自动创建新会话
     - price_config_id: 模型价格配置ID（从 /api/model-prices 获取）
     - prompt: 提示词
 
     流程：
-    1. 根据 price_config_id 查询模型配置
-    2. 检查积分是否足够
-    3. 冻结积分
-    4. 创建任务
-    5. 调用模型生成图片
-    6. 成功后扣除冻结积分，失败后退回冻结积分
+    1. 获取或创建会话
+    2. 写入用户消息
+    3. 创建任务 + 冻结积分（同一事务）
+    4. 写入 assistant 消息（running）
+    5. 立即返回 task_id 和 running 状态
+    6. 后台异步执行生图 + 写历史
 
     需要在请求头中携带: Authorization: Bearer <token>
     """
-    # 创建任务
-    task = generation_service.create_image_task(
+    # 1. 获取或创建会话
+    conversation, session_is_new = conversation_service.get_or_create_session(
         db=db,
         user_id=current_user.id,
-        price_config_id=request.price_config_id,
-        prompt=request.prompt
+        session_id=request.session_id,
+        session_type="image",
+        title=request.prompt[:50] if request.prompt else None,
     )
 
-    # 执行生图任务
-    success, error_msg, result = generation_service.execute_image_generation(
+    # 2. 写入用户消息
+    user_message = conversation_service.create_message(
         db=db,
-        task=task,
-        prompt=request.prompt
+        session_id=conversation.session_id,
+        user_id=current_user.id,
+        role="user",
+        content_type="text",
+        content_text=request.prompt,
     )
 
-    # 构建响应数据
-    response_data = TaskCreateResponse(
+    # 3. 创建任务（冻结积分 + 创建任务在同一事务）
+    #    如果失败需要回滚本次新建的会话和消息
+    try:
+        task = generation_service.create_image_task(
+            db=db,
+            user_id=current_user.id,
+            price_config_id=request.price_config_id,
+            prompt=request.prompt
+        )
+    except Exception as e:
+        # 回滚用户消息
+        try:
+            db.delete(user_message)
+            # 只有本次新建的会话才删除，避免误删已有空会话
+            if session_is_new:
+                db.delete(conversation)
+            db.commit()
+        except Exception:
+            db.rollback()
+        raise
+
+    # 4. 写入 assistant 消息（running）
+    assistant_message = conversation_service.create_message(
+        db=db,
+        session_id=conversation.session_id,
+        user_id=current_user.id,
+        role="assistant",
+        content_type="image",
+        content_text=None,
         task_id=task.task_id,
-        status=task.status,
-        frozen_points=task.frozen_points,
-        error_message=error_msg
+        status_val="running",
     )
 
+    # 5. 更新会话预览
+    conversation_service.update_session_preview(
+        db=db,
+        session_id=conversation.session_id,
+        preview=f"生成图片: {request.prompt[:100]}",
+    )
+
+    # 6. 提交异步生图任务（传入会话和消息信息供后续写历史）
+    background_tasks.add_task(
+        generation_service.execute_image_generation_by_task_id,
+        task.task_id,
+        request.prompt,
+        session_id=conversation.session_id,
+        assistant_message_id=assistant_message.message_id,
+    )
+
+    # 立即返回，不等待生图完成
     return ApiResponse(
-        code=0 if success else 50001,
-        message="success" if success else error_msg,
-        data=response_data,
-        success=success
+        code=0,
+        message="任务已提交",
+        data=TaskCreateResponse(
+            task_id=task.task_id,
+            status="running",
+            frozen_points=task.frozen_points,
+            error_message=None,
+            session_id=conversation.session_id,
+        ),
+        success=True
     )

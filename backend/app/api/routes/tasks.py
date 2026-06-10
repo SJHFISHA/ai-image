@@ -14,8 +14,35 @@ from app.schemas.generation import (
 )
 from app.schemas.common import ApiResponse
 from app.services import generation_service
+from app.providers.qiniu_provider import qiniu_provider
 
 router = APIRouter(prefix="/tasks", tags=["任务"])
+
+def resolve_task_image_urls(task) -> Optional[List[str]]:
+    """
+    Resolve task images for frontend display.
+
+    Prefer assets[].key because private bucket needs temporary signed URLs.
+    Fallback to result_json.images for old records.
+    """
+    if not task.result_json:
+        return None
+
+    assets = task.result_json.get("assets")
+    if isinstance(assets, list):
+        urls = []
+        for asset in assets:
+            key = asset.get("key") if isinstance(asset, dict) else None
+            if key:
+                urls.append(qiniu_provider.build_access_url(key))
+        if urls:
+            return urls
+
+    images = task.result_json.get("images")
+    if isinstance(images, list):
+        return images
+
+    return None
 
 
 @router.get("/{task_id}", response_model=ApiResponse[TaskDetailResponse], summary="查询任务详情")
@@ -47,9 +74,7 @@ def get_task_detail(
         )
 
     # 提取图片URL列表
-    images = None
-    if task.result_json and "images" in task.result_json:
-        images = task.result_json["images"]
+    images = resolve_task_image_urls(task)
 
     response_data = TaskDetailResponse(
         task_id=task.task_id,
@@ -102,9 +127,7 @@ def get_my_tasks(
     items = []
     for task in result["items"]:
         # 提取图片URL列表
-        images = None
-        if task.result_json and "images" in task.result_json:
-            images = task.result_json["images"]
+        images = resolve_task_image_urls(task)
 
         items.append(TaskDetailResponse(
             task_id=task.task_id,

@@ -8,6 +8,7 @@ from sqlalchemy import String, BigInteger, DateTime, Index, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.utils.timezone import now_beijing_naive
 
 
 class UserPointAccount(Base):
@@ -24,11 +25,11 @@ class UserPointAccount(Base):
     total_recharged_points: Mapped[int] = mapped_column(BigInteger, default=0, comment="累计充值积分")
     total_consumed_points: Mapped[int] = mapped_column(BigInteger, default=0, comment="累计消费积分")
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, comment="创建时间")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_beijing_naive, comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=now_beijing_naive,
+        onupdate=now_beijing_naive,
         comment="更新时间"
     )
 
@@ -71,7 +72,7 @@ class PointTransaction(Base):
 
     remark: Mapped[Optional[str]] = mapped_column(String(255), comment="备注")
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, comment="创建时间")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_beijing_naive, comment="创建时间")
 
     def __repr__(self):
         return f"<PointTransaction(no={self.transaction_no}, type={self.type}, points={self.points})>"

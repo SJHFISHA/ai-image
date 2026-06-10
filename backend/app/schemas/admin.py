@@ -246,3 +246,69 @@ class PointTransactionListResponse(BaseModel):
     """积分流水列表"""
     total: int = Field(..., description="总数")
     items: List[PointTransactionDetailResponse] = Field(..., description="流水列表")
+
+
+# ======================== 用户管理 ========================
+
+class AdminUserDetailResponse(BaseModel):
+    """用户详情"""
+    id: int = Field(..., description="用户ID")
+    username: Optional[str] = Field(None, description="用户名")
+    email: Optional[str] = Field(None, description="邮箱")
+    phone: Optional[str] = Field(None, description="手机号")
+    nickname: Optional[str] = Field(None, description="昵称")
+    avatar_url: Optional[str] = Field(None, description="头像URL")
+    status: str = Field(..., description="状态: normal, disabled")
+    last_login_at: Optional[datetime] = Field(None, description="最后登录时间")
+    created_at: datetime = Field(..., description="创建时间")
+    updated_at: datetime = Field(..., description="更新时间")
+
+    class Config:
+        from_attributes = True
+
+
+class AdminUserListResponse(BaseModel):
+    """用户列表"""
+    total: int = Field(..., description="总数")
+    items: List[AdminUserDetailResponse] = Field(..., description="用户列表")
+
+
+class AdminUserStatusUpdateRequest(BaseModel):
+    """更新用户状态"""
+    status: str = Field(..., description="状态: normal, disabled")
+
+
+# ======================== 生成任务管理 ========================
+
+class AdminTaskDetailResponse(BaseModel):
+    """生成任务详情"""
+    id: int = Field(..., description="记录ID")
+    task_id: str = Field(..., description="任务ID")
+    user_id: int = Field(..., description="用户ID")
+    username: Optional[str] = Field(None, description="用户名（关联查询）")
+    price_config_id: int = Field(..., description="价格配置ID")
+    model_key: str = Field(..., description="模型标识")
+    model_name: str = Field(..., description="模型名称")
+    capability_type: str = Field(..., description="能力类型")
+    image_size: Optional[str] = Field(None, description="图片尺寸")
+    image_count: Optional[int] = Field(None, description="图片数量")
+    status: str = Field(..., description="任务状态")
+    frozen_points: int = Field(..., description="冻结积分")
+    consumed_points: int = Field(..., description="消费积分")
+    refunded_points: int = Field(..., description="退回积分")
+    prompt: Optional[str] = Field(None, description="提示词")
+    error_message: Optional[str] = Field(None, description="错误信息")
+    request_json: Optional[dict] = Field(None, description="请求参数")
+    provider_response_json: Optional[dict] = Field(None, description="供应商原始响应")
+    created_at: datetime = Field(..., description="创建时间")
+    started_at: Optional[datetime] = Field(None, description="开始执行时间")
+    finished_at: Optional[datetime] = Field(None, description="完成时间")
+
+    class Config:
+        from_attributes = True
+
+
+class AdminTaskListResponse(BaseModel):
+    """生成任务列表"""
+    total: int = Field(..., description="总数")
+    items: List[AdminTaskDetailResponse] = Field(..., description="任务列表")

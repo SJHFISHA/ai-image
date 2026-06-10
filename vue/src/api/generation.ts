@@ -5,6 +5,7 @@ import { httpGet, httpPost } from '@/utils/request'
 
 // 请求参数类型
 export interface CreateImageTaskParams {
+  session_id?: string
   price_config_id: number
   prompt: string
 }
@@ -15,6 +16,7 @@ export interface TaskCreateResult {
   status: string
   frozen_points: number
   error_message?: string
+  session_id?: string
 }
 
 export interface TaskDetailResult {

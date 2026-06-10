@@ -252,9 +252,84 @@ export function adjustUserPoints(data: { user_id: number; points: number; remark
 // 积分流水
 export function getPointTransactionList(params?: {
   user_id?: number
-  type?: string
+  transaction_type?: string
   page?: number
   page_size?: number
 }) {
   return httpGet<PointTransactionListResult>('/admin/point-transactions', { params })
+}
+
+// ======================== 用户管理 ========================
+
+export interface AdminUser {
+  id: number
+  username?: string
+  email?: string
+  phone?: string
+  nickname?: string
+  avatar_url?: string
+  status: string
+  last_login_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminUserListResult {
+  total: number
+  items: AdminUser[]
+}
+
+export function getAdminUserList(params?: {
+  keyword?: string
+  status?: string
+  page?: number
+  page_size?: number
+}) {
+  return httpGet<AdminUserListResult>('/admin/users', { params })
+}
+
+export function updateAdminUserStatus(id: number, status: string) {
+  return httpPut<AdminUser>(`/admin/users/${id}/status`, { status })
+}
+
+// ======================== 生成任务管理 ========================
+
+export interface AdminTask {
+  id: number
+  task_id: string
+  user_id: number
+  username?: string
+  price_config_id: number
+  model_key: string
+  model_name: string
+  capability_type: string
+  image_size?: string
+  image_count?: number
+  status: string
+  frozen_points: number
+  consumed_points: number
+  refunded_points: number
+  prompt?: string
+  error_message?: string
+  request_json?: Record<string, any>
+  provider_response_json?: Record<string, any>
+  created_at: string
+  started_at?: string
+  finished_at?: string
+}
+
+export interface AdminTaskListResult {
+  total: number
+  items: AdminTask[]
+}
+
+export function getAdminTaskList(params?: {
+  user_id?: number
+  status?: string
+  task_id?: string
+  keyword?: string
+  page?: number
+  page_size?: number
+}) {
+  return httpGet<AdminTaskListResult>('/admin/tasks', { params })
 }

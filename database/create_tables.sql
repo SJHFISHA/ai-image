@@ -257,3 +257,90 @@ CREATE TABLE IF NOT EXISTS admin_users (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='后台管理员表';
+
+
+
+-- ============================================
+-- 9. 会话表
+-- ============================================
+
+CREATE TABLE conversation_sessions (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    session_id VARCHAR(64) NOT NULL UNIQUE COMMENT '会话ID',
+    user_id BIGINT NOT NULL COMMENT '用户ID',
+
+    title VARCHAR(255) DEFAULT NULL COMMENT '会话标题',
+    session_type VARCHAR(32) NOT NULL DEFAULT 'mixed' COMMENT 'chat,image,video,mixed',
+
+    last_message_preview VARCHAR(500) DEFAULT NULL COMMENT '最后一条消息预览',
+    last_message_at DATETIME DEFAULT NULL COMMENT '最后消息时间',
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_user_updated (user_id, updated_at),
+    INDEX idx_user_type (user_id, session_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='会话表';
+
+
+
+-- ============================================
+-- 10. 会话消息表表
+-- ============================================
+CREATE TABLE conversation_messages (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    message_id VARCHAR(64) NOT NULL UNIQUE COMMENT '消息ID',
+    session_id VARCHAR(64) NOT NULL COMMENT '会话ID',
+    user_id BIGINT NOT NULL COMMENT '用户ID',
+
+    role VARCHAR(32) NOT NULL COMMENT 'user, assistant, system',
+    content_type VARCHAR(32) NOT NULL COMMENT 'text,image,video,mixed',
+    content_text TEXT DEFAULT NULL COMMENT '文本内容或提示词',
+
+    task_id VARCHAR(64) DEFAULT NULL COMMENT '关联 generation_tasks.task_id',
+    status VARCHAR(32) NOT NULL DEFAULT 'success' COMMENT 'pending,running,success,failed',
+
+    metadata_json JSON DEFAULT NULL COMMENT '模型、尺寸、时长、积分等扩展信息',
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_session_created (session_id, created_at),
+    INDEX idx_user_created (user_id, created_at),
+    INDEX idx_task_id (task_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='会话消息表';
+
+
+
+
+-- ============================================
+-- 11. 媒体资源表
+-- ============================================
+
+CREATE TABLE media_assets (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    asset_id VARCHAR(64) NOT NULL UNIQUE COMMENT '资源ID',
+
+    user_id BIGINT NOT NULL COMMENT '用户ID',
+    session_id VARCHAR(64) DEFAULT NULL COMMENT '会话ID',
+    message_id VARCHAR(64) DEFAULT NULL COMMENT '消息ID',
+    task_id VARCHAR(64) DEFAULT NULL COMMENT '关联任务ID',
+
+    media_type VARCHAR(32) NOT NULL COMMENT 'image,video,audio,file',
+    provider VARCHAR(32) NOT NULL DEFAULT 'qiniu' COMMENT 'qiniu,local,s3',
+    bucket VARCHAR(128) DEFAULT NULL COMMENT '存储桶',
+    object_key VARCHAR(512) DEFAULT NULL COMMENT '云端对象key',
+    url VARCHAR(1024) NOT NULL COMMENT '公开访问URL',
+
+    mime_type VARCHAR(128) DEFAULT NULL,
+    file_size BIGINT DEFAULT NULL,
+    width INT DEFAULT NULL,
+    height INT DEFAULT NULL,
+    duration_seconds INT DEFAULT NULL,
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_user_created (user_id, created_at),
+    INDEX idx_session_id (session_id),
+    INDEX idx_message_id (message_id),
+    INDEX idx_task_id (task_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='媒体资源表';

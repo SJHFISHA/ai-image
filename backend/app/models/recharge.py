@@ -9,6 +9,7 @@ from sqlalchemy import String, BigInteger, Numeric, DateTime, SmallInteger, Inte
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.utils.timezone import now_beijing_naive
 
 
 class RechargePackage(Base):
@@ -28,11 +29,11 @@ class RechargePackage(Base):
     enabled: Mapped[int] = mapped_column(SmallInteger, default=1, comment="是否启用: 1=启用, 0=禁用")
     sort_order: Mapped[int] = mapped_column(Integer, default=0, comment="排序")
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, comment="创建时间")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_beijing_naive, comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=now_beijing_naive,
+        onupdate=now_beijing_naive,
         comment="更新时间"
     )
 
@@ -71,11 +72,11 @@ class RechargeOrder(Base):
 
     paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime, comment="支付成功时间")
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, comment="创建时间")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_beijing_naive, comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=now_beijing_naive,
+        onupdate=now_beijing_naive,
         comment="更新时间"
     )
 

@@ -14,7 +14,7 @@
         @press-enter="fetchList"
       />
       <a-select
-        v-model:value="filters.type"
+        v-model:value="filters.transaction_type"
         placeholder="流水类型"
         allow-clear
         style="width: 160px"
@@ -73,7 +73,7 @@ const loading = ref(false)
 
 const filters = reactive({
   user_id: undefined as number | undefined,
-  type: undefined as string | undefined,
+  transaction_type: undefined as string | undefined,
 })
 
 const pagination = reactive({

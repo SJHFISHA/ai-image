@@ -9,6 +9,7 @@ from sqlalchemy import String, BigInteger, Integer, DateTime, SmallInteger, Nume
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.utils.timezone import now_beijing_naive
 
 
 class ModelPriceConfig(Base):
@@ -50,11 +51,11 @@ class ModelPriceConfig(Base):
 
     remark: Mapped[Optional[str]] = mapped_column(String(255), comment="备注")
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, comment="创建时间")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_beijing_naive, comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=now_beijing_naive,
+        onupdate=now_beijing_naive,
         comment="更新时间"
     )
 

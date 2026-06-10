@@ -60,7 +60,8 @@ def add_points(
     points: int,
     transaction_type: str = "recharge",
     related_order_no: Optional[str] = None,
-    remark: Optional[str] = None
+    remark: Optional[str] = None,
+    auto_commit: bool = True
 ) -> PointTransaction:
     """
     增加积分（充值到账）
@@ -72,6 +73,7 @@ def add_points(
         transaction_type: 流水类型
         related_order_no: 关联订单号
         remark: 备注
+        auto_commit: 是否自动提交事务，默认True。设为False时由调用方控制事务提交。
 
     Returns:
         积分流水记录
@@ -112,7 +114,8 @@ def add_points(
     )
     db.add(transaction)
 
-    db.commit()
+    if auto_commit:
+        db.commit()
 
     app_logger.info(
         f"积分增加: user_id={user_id}, points={points}, "
@@ -127,7 +130,8 @@ def freeze_points(
     user_id: int,
     points: int,
     related_task_id: Optional[str] = None,
-    remark: Optional[str] = None
+    remark: Optional[str] = None,
+    auto_commit: bool = True
 ) -> PointTransaction:
     """
     冻结积分（创建任务时）
@@ -138,6 +142,7 @@ def freeze_points(
         points: 冻结的积分数量
         related_task_id: 关联任务ID
         remark: 备注
+        auto_commit: 是否自动提交事务，默认True。设为False时由调用方控制事务提交。
 
     Returns:
         积分流水记录
@@ -185,7 +190,8 @@ def freeze_points(
     )
     db.add(transaction)
 
-    db.commit()
+    if auto_commit:
+        db.commit()
 
     app_logger.info(
         f"积分冻结: user_id={user_id}, points={points}, "
@@ -200,7 +206,8 @@ def consume_frozen_points(
     user_id: int,
     points: int,
     related_task_id: Optional[str] = None,
-    remark: Optional[str] = None
+    remark: Optional[str] = None,
+    auto_commit: bool = True
 ) -> PointTransaction:
     """
     扣除冻结积分（任务成功时）
@@ -211,6 +218,7 @@ def consume_frozen_points(
         points: 扣除的积分数量
         related_task_id: 关联任务ID
         remark: 备注
+        auto_commit: 是否自动提交事务，默认True。设为False时由调用方控制事务提交。
 
     Returns:
         积分流水记录
@@ -258,7 +266,8 @@ def consume_frozen_points(
     )
     db.add(transaction)
 
-    db.commit()
+    if auto_commit:
+        db.commit()
 
     app_logger.info(
         f"积分扣除: user_id={user_id}, points={points}, "
@@ -273,7 +282,8 @@ def unfreeze_points(
     user_id: int,
     points: int,
     related_task_id: Optional[str] = None,
-    remark: Optional[str] = None
+    remark: Optional[str] = None,
+    auto_commit: bool = True
 ) -> PointTransaction:
     """
     解冻积分（任务失败时）
@@ -284,6 +294,7 @@ def unfreeze_points(
         points: 解冻的积分数量
         related_task_id: 关联任务ID
         remark: 备注
+        auto_commit: 是否自动提交事务，默认True。设为False时由调用方控制事务提交。
 
     Returns:
         积分流水记录
@@ -331,7 +342,8 @@ def unfreeze_points(
     )
     db.add(transaction)
 
-    db.commit()
+    if auto_commit:
+        db.commit()
 
     app_logger.info(
         f"积分解冻: user_id={user_id}, points={points}, "
