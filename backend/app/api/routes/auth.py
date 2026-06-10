@@ -16,6 +16,7 @@ from app.schemas.auth import (
 )
 from app.schemas.common import ApiResponse
 from app.services import auth_service
+from app.services.point_service import get_point_balance
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 
@@ -42,7 +43,8 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
             id=user.id,
             username=user.username,
             nickname=user.nickname,
-            avatar_url=user.avatar_url
+            avatar_url=user.avatar_url,
+            available_points=0
         )
     )
 
@@ -81,17 +83,19 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=ApiResponse[UserInfo], summary="获取当前用户信息")
-def get_me(current_user: User = Depends(get_current_user)):
+def get_me(current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
     """
     获取当前登录用户信息
 
     需要在请求头中携带: Authorization: Bearer <token>
     """
+    point_balance = get_point_balance(db, current_user.id)
     response_data = UserInfo(
         id=current_user.id,
         username=current_user.username,
         nickname=current_user.nickname,
-        avatar_url=current_user.avatar_url
+        avatar_url=current_user.avatar_url,
+        available_points=point_balance.get("available_points", 0)
     )
 
     return ApiResponse(

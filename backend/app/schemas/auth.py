@@ -24,6 +24,7 @@ class UserInfo(BaseModel):
     username: Optional[str] = Field(None, description="用户名")
     nickname: Optional[str] = Field(None, description="昵称")
     avatar_url: Optional[str] = Field(None, description="头像URL")
+    available_points: int = Field(default=0, description="可用积分")
 
     class Config:
         from_attributes = True

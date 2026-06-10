@@ -10,10 +10,14 @@ import {
   MenuUnfoldOutlined,
   BulbOutlined,
   BulbFilled,
-  DownOutlined,
   UserOutlined,
   LogoutOutlined,
   PictureOutlined,
+  HomeOutlined,
+  FolderOutlined,
+  AppstoreOutlined,
+  BellOutlined,
+  MobileOutlined,
 } from '@ant-design/icons-vue'
 import type { MenuTheme } from 'ant-design-vue'
 
@@ -34,6 +38,14 @@ const { Sider, Content } = Layout
 const isDark = ref(false)
 const collapsed = ref(false)
 const selectedKeys = ref<string[]>(['new-chat'])
+const primaryNavItems = [
+  { key: 'inspiration', label: '灵感', icon: HomeOutlined },
+  { key: 'generate', label: '生成', icon: AppstoreOutlined },
+  { key: 'assets', label: '资产', icon: FolderOutlined },
+  { key: 'canvas', label: '画布', icon: AppstoreOutlined },
+]
+
+const selectedPrimaryKey = ref('generate')
 
 const siderTheme = computed<MenuTheme>(() => (isDark.value ? 'dark' : 'light'))
 
@@ -104,108 +116,137 @@ onMounted(async () => {
       <template v-else>
         <Layout class="app-layout" style="height: 100vh">
           <Sider
-            v-model:collapsed="collapsed"
-            :collapsed-width="0"
-            :width="240"
-            class="app-sider"
+            :width="collapsed ? 248 : 320"
+            class="app-shell-sider"
+            :class="{ 'app-shell-sider-collapsed': collapsed }"
             :theme="siderTheme"
             :trigger="null"
-            collapsible
           >
-            <div class="sider-header">
-              <span v-if="!collapsed">开启创作</span>
-              <span v-else style="font-size: 14px">菜单</span>
-              <div class="sider-header-actions">
-                <Tooltip :title="collapsed ? '展开菜单' : '收起菜单'">
-                  <MenuUnfoldOutlined
-                    v-if="collapsed"
-                    class="sider-collapse-btn"
-                    @click="collapsed = false"
-                  />
-                  <MenuFoldOutlined
-                    v-else
-                    class="sider-collapse-btn"
-                    @click="collapsed = true"
-                  />
-                </Tooltip>
-              </div>
-            </div>
-            <Menu
-              v-if="!collapsed"
-              v-model:selectedKeys="selectedKeys"
-              mode="inline"
-              :theme="siderTheme"
-              class="sider-menu"
-            >
-              <Menu.Item key="new-chat">
-                <template #icon>
-                  <EditOutlined />
-                </template>
-                新对话
-              </Menu.Item>
-              <Menu.Item key="default-create">
-                <template #icon>
-                  <MessageOutlined />
-                </template>
-                默认创作
-              </Menu.Item>
-            </Menu>
+            <div class="two-level-sidebar">
+              <aside class="primary-sidebar">
+                <div class="brand-mark">✦</div>
 
-            <!-- 底部用户信息 -->
-            <div class="sider-footer">
-              <template v-if="userStore.isLoggedIn">
-                <input
-                  ref="avatarInput"
-                  type="file"
-                  accept="image/*"
-                  style="display: none"
-                  @change="handleAvatarChange"
-                />
-                <Dropdown :trigger="['click']">
-                  <div class="user-avatar-wrap">
-                    <a-avatar
-                      :size="36"
-                      :src="userStore.userInfo?.avatar_url"
-                      class="user-avatar"
-                    >
-                      <template #icon><UserOutlined /></template>
-                    </a-avatar>
-                    <span class="user-name">{{ userStore.userInfo?.username }}</span>
-                    <DownOutlined style="font-size: 10px; color: #999" />
+                <nav class="primary-nav">
+                  <button
+                    v-for="item in primaryNavItems"
+                    :key="item.key"
+                    class="primary-nav-item"
+                    :class="{ active: selectedPrimaryKey === item.key }"
+                    type="button"
+                    @click="selectedPrimaryKey = item.key"
+                  >
+                    <component :is="item.icon" class="primary-nav-icon" />
+                    <span>{{ item.label }}</span>
+                  </button>
+                </nav>
+
+                <div class="primary-sidebar-bottom">
+                  <div class="points-pill">
+                    <span class="points-value">✦ {{ userStore.userInfo?.available_points ?? 0 }}</span>
+                    <span class="points-label">积分</span>
                   </div>
-                  <template #overlay>
-                    <Menu>
-                      <Menu.Item @click="triggerAvatarUpload">
-                        <PictureOutlined />
-                        更换头像
-                      </Menu.Item>
-                      <Menu.Item @click="router.push('/')">
-                        <UserOutlined />
-                        用户中心
-                      </Menu.Item>
-                      <a-menu-divider />
-                      <Menu.Item @click="handleLogout">
-                        <LogoutOutlined />
-                        退出登录
-                      </Menu.Item>
-                    </Menu>
+
+                  <template v-if="userStore.isLoggedIn">
+                    <input
+                      ref="avatarInput"
+                      type="file"
+                      accept="image/*"
+                      style="display: none"
+                      @change="handleAvatarChange"
+                    />
+                    <Dropdown :trigger="['click']">
+                      <button class="primary-avatar-btn" type="button">
+                        <a-avatar
+                          :size="32"
+                          :src="userStore.userInfo?.avatar_url"
+                          class="primary-avatar"
+                        >
+                          <template #icon><UserOutlined /></template>
+                        </a-avatar>
+                      </button>
+                      <template #overlay>
+                        <Menu>
+                          <Menu.Item @click="triggerAvatarUpload">
+                            <PictureOutlined />
+                            更换头像
+                          </Menu.Item>
+                          <Menu.Item @click="router.push('/')">
+                            <UserOutlined />
+                            用户中心
+                          </Menu.Item>
+                          <a-menu-divider />
+                          <Menu.Item @click="handleLogout">
+                            <LogoutOutlined />
+                            退出登录
+                          </Menu.Item>
+                        </Menu>
+                      </template>
+                    </Dropdown>
                   </template>
-                </Dropdown>
-              </template>
-              <template v-else>
-                <a-button type="primary" size="small" block @click="router.push('/login')">
-                  登录
-                </a-button>
-              </template>
+
+                  <template v-else>
+                    <button class="primary-login-btn" type="button" @click="router.push('/login')">
+                      登录
+                    </button>
+                  </template>
+
+                  <button class="primary-tool-btn" type="button">
+                    <BellOutlined />
+                  </button>
+                  <button class="primary-tool-btn" type="button">
+                    <MobileOutlined />
+                    <span>CLI</span>
+                  </button>
+                </div>
+              </aside>
+
+              <aside class="secondary-sidebar" :class="{ collapsed }">
+                <div class="secondary-header">
+                  <button class="quick-new-chat-btn" type="button" @click="selectedKeys = ['new-chat']">
+                    新对话
+                  </button>
+
+                  <Tooltip :title="collapsed ? '展开聊天区域' : '收起聊天区域'">
+                    <button class="secondary-collapse-btn" type="button" @click="collapsed = !collapsed">
+                      <MenuUnfoldOutlined v-if="collapsed" />
+                      <MenuFoldOutlined v-else />
+                    </button>
+                  </Tooltip>
+                </div>
+
+                <template v-if="!collapsed">
+                  <Menu
+                    :selected-keys="selectedKeys"
+                    mode="inline"
+                    :theme="siderTheme"
+                    class="secondary-menu"
+                    @select="({ key }) => (selectedKeys = [String(key)])"
+                  >
+                    <Menu.Item key="new-chat">
+                      <template #icon>
+                        <EditOutlined />
+                      </template>
+                      新对话
+                    </Menu.Item>
+                    <Menu.Item key="default-create">
+                      <template #icon>
+                        <MessageOutlined />
+                      </template>
+                      默认创作
+                    </Menu.Item>
+                  </Menu>
+
+                  <div class="recent-section">
+                    <div class="recent-title">最近</div>
+                    <button class="recent-item" type="button">
+                      <span class="recent-thumb"></span>
+                      <span class="recent-text">未来机甲战士都市废墟</span>
+                    </button>
+                  </div>
+                </template>
+              </aside>
             </div>
           </Sider>
-
-          <!-- 收起后显示的展开按钮 -->
-          <div v-if="collapsed" class="sider-expand-btn-wrap">
-            <Tooltip title="展开菜单">
-              <MenuUnfoldOutlined class="sider-expand-btn" @click="collapsed = false" />
-            </Tooltip>
-          </div>
 
           <Layout>
             <Content class="main-content">
@@ -241,60 +282,356 @@ onMounted(async () => {
   border-radius: 8px;
 }
 
-.sider-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.sider-expand-btn-wrap {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 10;
-}
-
-.top-bar {
-  height: 48px;
+.app-shell-sider.ant-layout-sider {
   background: #fff;
-  border-bottom: 1px solid #f0f0f0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0 16px;
+  border-right: 1px solid #eeeeee;
+  box-shadow: none;
 }
 
-.top-bar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.app-shell-sider.ant-layout-sider.app-shell-sider-collapsed {
+  border-right: none;
 }
 
-.user-avatar-wrap {
+.two-level-sidebar {
+  height: 100vh;
+  display: flex;
+  background: #fff;
+}
+
+.primary-sidebar {
+  width: 72px;
+  height: 100%;
+  border-right: 1px solid #eeeeee;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 10px 18px;
+  box-sizing: border-box;
+}
+
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s;
+  justify-content: center;
+  color: #12b5ff;
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 140px;
+}
+
+.primary-nav {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
-.user-avatar-wrap:hover {
-  background: rgba(0, 0, 0, 0.04);
+.primary-nav-item {
+  width: 52px;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.88);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  border-radius: 8px;
+  padding: 4px 0;
 }
 
-.user-avatar {
+.primary-nav-item:hover,
+.primary-nav-item.active {
+  background: #f2f3f5;
+}
+
+.primary-nav-icon {
+  font-size: 18px;
+}
+
+.primary-sidebar-bottom {
+  width: 100%;
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.points-pill {
+  width: 48px;
+  min-height: 42px;
+  border-radius: 10px;
+  background: #f2fbff;
+  color: #00a6ed;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.points-value {
+  font-weight: 600;
+  line-height: 1;
+}
+
+.points-label {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.primary-avatar-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.primary-avatar {
   cursor: pointer;
   flex-shrink: 0;
 }
 
-.user-name {
-  flex: 1;
+.primary-login-btn {
+  border: none;
+  background: #1677ff;
+  color: #fff;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.primary-tool-btn {
+  width: 40px;
+  min-height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.68);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.primary-tool-btn:hover {
+  background: #f2f3f5;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.secondary-sidebar {
+  width: 248px;
+  height: 100%;
+  padding: 28px 20px 20px;
+  box-sizing: border-box;
+  background: #fff;
+  transition: width 0.2s ease, padding 0.2s ease;
+  overflow: hidden;
+}
+
+.secondary-sidebar.collapsed {
+  width: 176px;
+  padding: 28px 26px 20px;
+}
+
+.secondary-header {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid #eeeeee;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  color: rgba(0, 0, 0, 0.88);
   font-size: 14px;
+  margin-bottom: 20px;
+  white-space: nowrap;
+}
+
+.quick-new-chat-btn {
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.88);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  white-space: nowrap;
+}
+
+.quick-new-chat-btn:hover {
+  color: #1677ff;
+}
+
+.secondary-collapse-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-left: 1px solid #eeeeee;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding-left: 8px;
+}
+
+.secondary-collapse-btn:hover {
+  background: #f2f3f5;
+}
+
+.secondary-menu.ant-menu {
+  border-inline-end: none;
+  background: transparent;
+}
+
+.secondary-menu .ant-menu-item {
+  height: 36px;
+  line-height: 36px;
+  border-radius: 8px;
+  margin-inline: 0;
+  margin-block: 4px;
+  width: 100%;
+}
+
+.secondary-menu .ant-menu-item-selected {
+  background: #f2f3f5;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.recent-section {
+  margin-top: 24px;
+}
+
+.recent-title {
+  color: rgba(0, 0, 0, 0.42);
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.recent-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 2px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.88);
+  text-align: left;
+}
+
+.recent-item:hover {
+  background: #f5f5f5;
+}
+
+.recent-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #1d3557, #52b6ff);
+}
+
+.recent-text {
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+[data-theme='dark'] .app-shell-sider.ant-layout-sider,
+[data-theme='dark'] .two-level-sidebar,
+[data-theme='dark'] .primary-sidebar,
+[data-theme='dark'] .secondary-sidebar {
+  background: #141414;
+  border-color: #303030;
+}
+
+
+[data-theme='dark'] .secondary-header {
+  background: #141414;
+  border-color: #303030;
+}
+
+[data-theme='dark'] .quick-new-chat-btn {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+[data-theme='dark'] .quick-new-chat-btn:hover {
+  color: #4096ff;
+}
+
+[data-theme='dark'] .secondary-collapse-btn {
+  border-left-color: #303030;
+}
+
+[data-theme='dark'] .primary-nav-item,
+[data-theme='dark'] .primary-tool-btn,
+[data-theme='dark'] .secondary-header,
+[data-theme='dark'] .secondary-collapse-btn,
+[data-theme='dark'] .recent-item {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+[data-theme='dark'] .primary-nav-item:hover,
+[data-theme='dark'] .primary-nav-item.active,
+[data-theme='dark'] .primary-tool-btn:hover,
+[data-theme='dark'] .secondary-collapse-btn:hover,
+[data-theme='dark'] .recent-item:hover,
+[data-theme='dark'] .secondary-menu .ant-menu-item-selected {
+  background: #262626;
+}
+
+[data-theme='dark'] .points-pill {
+  background: rgba(0, 166, 237, 0.12);
+}
+
+.theme-toggle-btn {
+  position: fixed;
+  top: 24px;
+  right: 28px;
+  z-index: 20;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.58);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.theme-toggle-btn:hover {
+  background: #f2f3f5;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+
 </style>

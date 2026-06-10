@@ -21,6 +21,7 @@ export interface UserInfo {
   username: string
   nickname?: string
   avatar_url?: string
+  available_points?: number
 }
 
 export interface TokenResult {
