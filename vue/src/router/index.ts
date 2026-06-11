@@ -26,6 +26,12 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/assets',
+      name: 'assets',
+      component: () => import('@/views/AssetView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/image-generate',
       name: 'image-generate',
       component: () => import('@/views/HomeView.vue'),

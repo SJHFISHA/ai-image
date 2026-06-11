@@ -168,6 +168,28 @@ def execute_image_generation(
         )
         task.status = "success"
 
+        # 写入独立资产表：无论是否有关联会话，生成成功后都记录资产
+        created_media_assets = []
+        for asset_info in uploaded_assets:
+            created_media_assets.append(
+                conversation_service.create_media_asset(
+                    db=db,
+                    user_id=task.user_id,
+                    url=asset_info["url"],
+                    media_type="image",
+                    session_id=session_id,
+                    message_id=assistant_message_id,
+                    task_id=task.task_id,
+                    provider="qiniu",
+                    bucket=asset_info.get("bucket"),
+                    object_key=asset_info.get("key"),
+                    mime_type=asset_info.get("mime_type"),
+                    file_size=asset_info.get("file_size"),
+                    width=asset_info.get("width"),
+                    height=asset_info.get("height"),
+                )
+            )
+
         # ========== 写入对话历史 ==========
         if session_id and assistant_message_id:
             # 更新 assistant 消息状态为 success
@@ -184,21 +206,6 @@ def execute_image_generation(
                 },
             )
 
-            # 写入媒体资源记录
-            for asset_info in uploaded_assets:
-                conversation_service.create_media_asset(
-                    db=db,
-                    user_id=task.user_id,
-                    url=asset_info["url"],
-                    media_type="image",
-                    session_id=session_id,
-                    message_id=assistant_message_id,
-                    task_id=task.task_id,
-                    provider="qiniu",
-                    bucket=asset_info.get("key"),
-                    object_key=asset_info.get("key"),
-                    mime_type=asset_info.get("mime_type"),
-                )
 
             # 更新会话预览
             conversation_service.update_session_preview(

@@ -18,8 +18,8 @@ import {
   HomeOutlined,
   FolderOutlined,
   AppstoreOutlined,
+  FileImageOutlined,
   BellOutlined,
-  MobileOutlined,
   ClockCircleOutlined,
 } from '@ant-design/icons-vue'
 import type { MenuTheme } from 'ant-design-vue'
@@ -71,7 +71,7 @@ const isDark = ref(false)
 const collapsed = ref(false)
 const selectedKeys = ref<string[]>(['new-chat'])
 const primaryNavItems = [
-  { key: 'dashboard', label: '用户中心', icon: UserOutlined, path: '/dashboard' },
+  { key: 'assets', label: '资产', icon: FileImageOutlined, path: '/assets' },
   { key: 'generate', label: '生成', icon: AppstoreOutlined, path: '/image-generate' },
   { key: 'tasks', label: '任务', icon: FolderOutlined, path: '/tasks' },
   { key: 'points', label: '积分', icon: EditOutlined, path: '/points/logs' },
@@ -221,7 +221,7 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
                     <Dropdown :trigger="['click']">
                       <button class="primary-avatar-btn" type="button">
                         <a-avatar
-                          :size="32"
+                          :size="24"
                           :src="userStore.userInfo?.avatar_url"
                           class="primary-avatar"
                         >
@@ -254,12 +254,8 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
                     </button>
                   </template>
 
-                  <button class="primary-tool-btn" type="button">
-                    <BellOutlined />
-                  </button>
-                  <button class="primary-tool-btn" type="button">
-                    <MobileOutlined />
-                    <span>CLI</span>
+                  <button class="primary-bell-btn" type="button" title="通知">
+                    <BellOutlined class="primary-bell-icon" />
                   </button>
                 </div>
               </aside>
@@ -457,16 +453,52 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
 }
 
 .primary-avatar-btn {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border: none;
-  border-radius: 50%;
+  border-radius: 8px;
   background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
+}
+
+.primary-bell-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #5f6b7a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  font-size: 18px;
+}
+
+.primary-bell-btn:hover {
+  background: #f2f3f5;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.primary-bell-icon {
+  color: currentColor;
+  font-size: 18px;
+  line-height: 1;
+}
+
+[data-theme='dark'] .primary-bell-btn {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+[data-theme='dark'] .primary-bell-btn:hover {
+  background: #262626;
+  color: #fff;
 }
 
 .primary-avatar {
@@ -485,26 +517,6 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
   cursor: pointer;
 }
 
-.primary-tool-btn {
-  width: 40px;
-  min-height: 36px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: rgba(0, 0, 0, 0.68);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.primary-tool-btn:hover {
-  background: #f2f3f5;
-  color: rgba(0, 0, 0, 0.88);
-}
 
 .secondary-sidebar {
   width: 248px;
@@ -673,7 +685,7 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
 }
 
 [data-theme='dark'] .primary-nav-item,
-[data-theme='dark'] .primary-tool-btn,
+[data-theme='dark'] .primary-bell-btn,
 [data-theme='dark'] .secondary-header,
 [data-theme='dark'] .secondary-collapse-btn,
 [data-theme='dark'] .recent-item {
@@ -682,7 +694,7 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
 
 [data-theme='dark'] .primary-nav-item:hover,
 [data-theme='dark'] .primary-nav-item.active,
-[data-theme='dark'] .primary-tool-btn:hover,
+[data-theme='dark'] .primary-bell-btn:hover,
 [data-theme='dark'] .secondary-collapse-btn:hover,
 [data-theme='dark'] .recent-item:hover,
 [data-theme='dark'] .secondary-menu .ant-menu-item-selected {

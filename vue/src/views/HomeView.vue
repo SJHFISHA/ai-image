@@ -14,7 +14,6 @@ import { useUserStore } from '@/stores/user'
 import { getModelPrices } from '@/api/modelPrice'
 import type { ModelPriceItem } from '@/api/modelPrice'
 import { createImageTask, getTaskDetail } from '@/api/generation'
-import type { TaskCreateResult, TaskDetailResult } from '@/api/generation'
 import { getConversationDetail } from '@/api/conversation'
 import type { ConversationMessage } from '@/api/conversation'
 
@@ -29,6 +28,21 @@ const generatedImages = ref<string[]>([])
 const previewImage = ref('')
 const currentPrompt = ref('')
 const promptExpanded = ref(false)
+const expandedHistoryMessageIds = ref<Set<string>>(new Set())
+
+function toggleHistoryMessageExpanded(messageId: string) {
+  const next = new Set(expandedHistoryMessageIds.value)
+  if (next.has(messageId)) {
+    next.delete(messageId)
+  } else {
+    next.add(messageId)
+  }
+  expandedHistoryMessageIds.value = next
+}
+
+function isHistoryMessageExpanded(messageId: string) {
+  return expandedHistoryMessageIds.value.has(messageId)
+}
 const pollTimer = ref<ReturnType<typeof setInterval> | undefined>(undefined)
 const isCreatingSession = ref(false)
 
@@ -75,23 +89,27 @@ function closeImagePreview() {
   previewImage.value = ''
 }
 
-async function copyPrompt() {
-  if (!currentPrompt.value) return
+async function copyPrompt(text = currentPrompt.value) {
+  const value = text.trim()
+  if (!value) return
 
   try {
-    await navigator.clipboard.writeText(currentPrompt.value)
+    await navigator.clipboard.writeText(value)
     message.success('已复制')
   } catch {
     message.error('复制失败')
   }
 }
 
-function editPrompt() {
-  if (!currentPrompt.value) return
+function editPrompt(text = currentPrompt.value) {
+  const value = text.trim()
+  if (!value) return
 
-  inputText.value = currentPrompt.value
+  inputText.value = value
   generatedImages.value = []
   previewImage.value = ''
+  currentPrompt.value = ''
+  promptExpanded.value = false
 }
 
 function downloadImage(image: string) {
@@ -337,8 +355,40 @@ onMounted(() => {
       <template v-for="msg in historyMessages" :key="msg.message_id">
         <div v-if="msg.role === 'user'" class="user-row">
           <div class="user-bubble-wrap">
-            <div class="user-bubble">
+            <div
+              class="user-bubble"
+              :class="{ expanded: isHistoryMessageExpanded(msg.message_id) }"
+            >
               {{ msg.content_text }}
+            </div>
+
+            <div class="prompt-actions">
+              <button
+                class="prompt-action-btn"
+                type="button"
+                title="复制"
+                @click="copyPrompt(msg.content_text || '')"
+              >
+                <CopyOutlined />
+              </button>
+
+              <button
+                v-if="(msg.content_text || '').length > 80"
+                class="prompt-toggle-btn"
+                type="button"
+                @click="toggleHistoryMessageExpanded(msg.message_id)"
+              >
+                {{ isHistoryMessageExpanded(msg.message_id) ? '收起' : '展开' }}
+              </button>
+
+              <button
+                class="prompt-action-btn"
+                type="button"
+                title="编辑"
+                @click="editPrompt(msg.content_text || '')"
+              >
+                <EditOutlined />
+              </button>
             </div>
           </div>
         </div>
@@ -379,7 +429,7 @@ onMounted(() => {
               class="prompt-action-btn"
               type="button"
               title="复制"
-              @click="copyPrompt"
+              @click="copyPrompt()"
             >
               <CopyOutlined />
             </button>
@@ -397,7 +447,7 @@ onMounted(() => {
               class="prompt-action-btn"
               type="button"
               title="编辑"
-              @click="editPrompt"
+              @click="editPrompt()"
             >
               <EditOutlined />
             </button>

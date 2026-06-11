@@ -49,3 +49,22 @@ class TaskListResponse(BaseModel):
     """任务列表响应"""
     total: int = Field(..., description="总数")
     items: list[TaskDetailResponse] = Field(..., description="任务列表")
+
+class AssetItemResponse(BaseModel):
+    """资产项"""
+    id: int = Field(..., description="资产记录ID")
+    asset_id: str = Field(..., description="资产ID")
+    task_id: str = Field(..., description="任务ID")
+    type: str = Field(..., description="资产类型: image, video, audio")
+    url: str = Field(..., description="资源URL")
+    cover_url: Optional[str] = Field(None, description="封面URL")
+    title: Optional[str] = Field(None, description="标题")
+    prompt: Optional[str] = Field(None, description="提示词")
+    model_name: Optional[str] = Field(None, description="模型名称")
+    created_at: datetime = Field(..., description="创建时间")
+
+
+class AssetListResponse(BaseModel):
+    """资产列表"""
+    total: int = Field(..., description="总数")
+    items: List[AssetItemResponse] = Field(..., description="资产列表")

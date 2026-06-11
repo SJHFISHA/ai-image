@@ -340,6 +340,7 @@ CREATE TABLE media_assets (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     INDEX idx_user_created (user_id, created_at),
+    INDEX idx_user_type_created (user_id, media_type, created_at),
     INDEX idx_session_id (session_id),
     INDEX idx_message_id (message_id),
     INDEX idx_task_id (task_id)
