@@ -25,6 +25,8 @@ class GenerationTask(Base):
 
     model_key: Mapped[str] = mapped_column(String(128), comment="模型标识")
     model_name: Mapped[str] = mapped_column(String(128), comment="模型名称")
+    provider_key: Mapped[Optional[str]] = mapped_column(String(64), comment="供应商标识")
+    route_mode: Mapped[Optional[str]] = mapped_column(String(32), comment="路由模式")
     capability_type: Mapped[str] = mapped_column(String(32), comment="能力类型: image, video, text, audio")
 
     image_size: Mapped[Optional[str]] = mapped_column(String(32), comment="图片尺寸")

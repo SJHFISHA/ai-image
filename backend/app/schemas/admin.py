@@ -33,14 +33,61 @@ class AdminLoginResponse(BaseModel):
     admin: AdminInfo = Field(..., description="管理员信息")
 
 
+# ======================== 模型配置 CRUD ========================
+
+class ModelConfigCreateRequest(BaseModel):
+    """创建模型配置"""
+    model_key: str = Field(..., max_length=128, description="真实模型标识")
+    model_name: str = Field(..., max_length=128, description="前端展示名称")
+    provider_key: str = Field(..., max_length=64, description="供应商标识")
+    route_mode: Optional[str] = Field(None, max_length=32, description="路由模式: price, speed, success_rate")
+    capability_type: str = Field(..., description="能力类型: image, video, text, audio")
+    enabled: int = Field(1, description="是否启用: 1=启用, 0=禁用")
+    sort_order: int = Field(0, description="排序")
+    remark: Optional[str] = Field(None, max_length=255, description="备注")
+
+
+class ModelConfigUpdateRequest(BaseModel):
+    """更新模型配置"""
+    model_key: Optional[str] = Field(None, max_length=128, description="真实模型标识")
+    model_name: Optional[str] = Field(None, max_length=128, description="前端展示名称")
+    provider_key: Optional[str] = Field(None, max_length=64, description="供应商标识")
+    route_mode: Optional[str] = Field(None, max_length=32, description="路由模式")
+    capability_type: Optional[str] = Field(None, description="能力类型")
+    enabled: Optional[int] = Field(None, description="是否启用")
+    sort_order: Optional[int] = Field(None, description="排序")
+    remark: Optional[str] = Field(None, max_length=255, description="备注")
+
+
+class ModelConfigDetailResponse(BaseModel):
+    """模型配置详情"""
+    id: int = Field(..., description="配置ID")
+    model_key: str = Field(..., description="真实模型标识")
+    model_name: str = Field(..., description="前端展示名称")
+    provider_key: str = Field(..., description="供应商标识")
+    route_mode: Optional[str] = Field(None, description="路由模式")
+    capability_type: str = Field(..., description="能力类型")
+    enabled: int = Field(..., description="是否启用")
+    sort_order: int = Field(..., description="排序")
+    remark: Optional[str] = Field(None, description="备注")
+    created_at: datetime = Field(..., description="创建时间")
+    updated_at: datetime = Field(..., description="更新时间")
+
+    class Config:
+        from_attributes = True
+
+
+class ModelConfigListResponse(BaseModel):
+    """模型配置列表"""
+    total: int = Field(..., description="总数")
+    items: List[ModelConfigDetailResponse] = Field(..., description="配置列表")
+
+
 # ======================== 模型价格配置 CRUD ========================
 
 class ModelPriceConfigCreateRequest(BaseModel):
     """创建模型价格配置"""
-    model_key: str = Field(..., max_length=128, description="模型标识")
-    model_name: str = Field(..., max_length=128, description="前端展示名称")
-    capability_type: str = Field(..., description="能力类型: image, video, text, audio")
-    provider_key: str = Field("api_gateway", max_length=64, description="供应商标识")
+    model_id: int = Field(..., description="关联 model_configs.id")
     billing_mode: str = Field("fixed", max_length=32, description="计费方式")
     image_size: Optional[str] = Field(None, max_length=32, description="图片尺寸")
     image_count: int = Field(1, ge=1, description="生成图片数量")
@@ -56,10 +103,7 @@ class ModelPriceConfigCreateRequest(BaseModel):
 
 class ModelPriceConfigUpdateRequest(BaseModel):
     """更新模型价格配置"""
-    model_key: Optional[str] = Field(None, max_length=128, description="模型标识")
-    model_name: Optional[str] = Field(None, max_length=128, description="前端展示名称")
-    capability_type: Optional[str] = Field(None, description="能力类型")
-    provider_key: Optional[str] = Field(None, max_length=64, description="供应商标识")
+    model_id: Optional[int] = Field(None, description="关联 model_configs.id")
     billing_mode: Optional[str] = Field(None, max_length=32, description="计费方式")
     image_size: Optional[str] = Field(None, max_length=32, description="图片尺寸")
     image_count: Optional[int] = Field(None, ge=1, description="生成图片数量")
@@ -76,8 +120,9 @@ class ModelPriceConfigUpdateRequest(BaseModel):
 class ModelPriceConfigDetailResponse(BaseModel):
     """模型价格配置详情"""
     id: int = Field(..., description="配置ID")
+    model_id: int = Field(..., description="关联模型配置ID")
     model_key: str = Field(..., description="模型标识")
-    model_name: str = Field(..., description="前端展示名称")
+    model_name: str = Field(..., description="模型名称")
     capability_type: str = Field(..., description="能力类型")
     provider_key: str = Field(..., description="供应商标识")
     billing_mode: str = Field(..., description="计费方式")

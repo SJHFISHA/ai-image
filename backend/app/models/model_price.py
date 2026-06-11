@@ -5,8 +5,8 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import String, BigInteger, Integer, DateTime, SmallInteger, Numeric, Index
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, BigInteger, Integer, DateTime, SmallInteger, Numeric, Index, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.utils.timezone import now_beijing_naive
@@ -19,18 +19,10 @@ class ModelPriceConfig(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    model_key: Mapped[str] = mapped_column(String(128), comment="模型标识")
-    model_name: Mapped[str] = mapped_column(String(128), comment="前端展示名称")
-
-    capability_type: Mapped[str] = mapped_column(
-        String(32),
-        comment="能力类型: image, video, text, audio"
-    )
-
-    provider_key: Mapped[str] = mapped_column(
-        String(64),
-        default="api_gateway",
-        comment="供应商/中转站标识"
+    model_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("model_configs.id"),
+        comment="关联 model_configs.id"
     )
 
     billing_mode: Mapped[str] = mapped_column(String(32), default="fixed", comment="计费方式: fixed")
@@ -59,5 +51,11 @@ class ModelPriceConfig(Base):
         comment="更新时间"
     )
 
+    model_config: Mapped[Optional["ModelConfig"]] = relationship(
+        "ModelConfig",
+        back_populates="price_configs",
+        lazy="select"
+    )
+
     def __repr__(self):
-        return f"<ModelPriceConfig(id={self.id}, model={self.model_key}, points={self.points})>"
+        return f"<ModelPriceConfig(id={self.id}, model_id={self.model_id}, points={self.points})>"

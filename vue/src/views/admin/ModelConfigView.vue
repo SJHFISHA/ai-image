@@ -1,9 +1,9 @@
 <template>
   <div>
     <div class="page-header">
-      <h2>模型价格配置</h2>
+      <h2>模型配置</h2>
       <a-button type="primary" @click="openCreateModal">
-        <PlusOutlined /> 新增配置
+        <PlusOutlined /> 新增模型
       </a-button>
     </div>
 
@@ -51,6 +51,12 @@
       size="middle"
     >
       <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'route_mode'">
+          <a-tag v-if="record.route_mode" :color="routeModeColor(record.route_mode)">
+            {{ routeModeLabel(record.route_mode) }}
+          </a-tag>
+          <span v-else>-</span>
+        </template>
         <template v-if="column.key === 'capability_type'">
           <a-tag :color="capabilityColor(record.capability_type)">
             {{ capabilityLabel(record.capability_type) }}
@@ -78,32 +84,38 @@
     <!-- 新增/编辑弹窗 -->
     <a-modal
       v-model:open="modalVisible"
-      :title="isEdit ? '编辑配置' : '新增配置'"
+      :title="isEdit ? '编辑模型' : '新增模型'"
       @ok="handleSubmit"
       :confirm-loading="submitting"
-      width="680px"
+      width="600px"
     >
       <a-form :model="formData" :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
-        <a-form-item label="选择模型" required>
-          <a-select
-            v-model:value="formData.model_id"
-            placeholder="请选择模型"
-            :options="modelOptions"
-            show-search
-            :filter-option="(input: string, option: any) => option.label.toLowerCase().indexOf(input.toLowerCase()) >= 0"
-          />
+        <a-form-item label="模型标识" required>
+          <a-input v-model:value="formData.model_key" placeholder="如 gpt-image-2" />
         </a-form-item>
-        <a-form-item label="图片尺寸">
-          <a-input v-model:value="formData.image_size" placeholder="如 1024x1024" />
+        <a-form-item label="展示名称" required>
+          <a-input v-model:value="formData.model_name" placeholder="如 GPT Image 2" />
         </a-form-item>
-        <a-form-item label="图片数量">
-          <a-input-number v-model:value="formData.image_count" :min="1" style="width: 100%" />
+        <a-form-item label="供应商标识" required>
+          <a-select v-model:value="formData.provider_key">
+            <a-select-option value="api_gateway">API Gateway</a-select-option>
+            <a-select-option value="google_genai">Google GenAI</a-select-option>
+          </a-select>
         </a-form-item>
-        <a-form-item label="消耗积分" required>
-          <a-input-number v-model:value="formData.points" :min="0" style="width: 100%" />
+        <a-form-item label="路由模式">
+          <a-select v-model:value="formData.route_mode" allow-clear placeholder="请选择路由模式">
+            <a-select-option value="price">价格最低</a-select-option>
+            <a-select-option value="speed">速度最快</a-select-option>
+            <a-select-option value="success_rate">成功率最高</a-select-option>
+          </a-select>
         </a-form-item>
-        <a-form-item label="成本金额">
-          <a-input-number v-model:value="formData.cost_amount" :min="0" :precision="6" style="width: 100%" />
+        <a-form-item label="能力类型" required>
+          <a-select v-model:value="formData.capability_type">
+            <a-select-option value="image">图片生成</a-select-option>
+            <a-select-option value="video">视频生成</a-select-option>
+            <a-select-option value="text">文本生成</a-select-option>
+            <a-select-option value="audio">音频生成</a-select-option>
+          </a-select>
         </a-form-item>
         <a-form-item label="排序">
           <a-input-number v-model:value="formData.sort_order" :min="0" style="width: 100%" />
@@ -120,20 +132,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import {
-  getModelPriceList,
-  createModelPriceConfig,
-  updateModelPriceConfig,
-  deleteModelPriceConfig,
   getModelConfigList,
+  createModelConfig,
+  updateModelConfig,
+  deleteModelConfig,
 } from '@/api/admin'
-import type { ModelPriceConfig, ModelConfig } from '@/api/admin'
+import type { ModelConfig } from '@/api/admin'
 
-const list = ref<ModelPriceConfig[]>([])
-const modelList = ref<ModelConfig[]>([])
+const list = ref<ModelConfig[]>([])
 const loading = ref(false)
 const modalVisible = ref(false)
 const isEdit = ref(false)
@@ -155,31 +165,23 @@ const pagination = reactive({
 })
 
 const formData = reactive({
-  model_id: undefined as number | undefined,
-  image_size: '',
-  image_count: 1,
-  points: 0,
-  cost_amount: undefined as number | undefined,
+  model_key: '',
+  model_name: '',
+  provider_key: 'api_gateway',
+  route_mode: undefined as string | undefined,
+  capability_type: 'image',
   sort_order: 0,
   enabled: 1,
   remark: '',
 })
 
-const modelOptions = computed(() =>
-  modelList.value.map(m => ({
-    value: m.id,
-    label: `${m.model_name} (${m.model_key})`,
-  }))
-)
-
 const columns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
   { title: '模型标识', dataIndex: 'model_key', key: 'model_key' },
   { title: '展示名称', dataIndex: 'model_name', key: 'model_name' },
+  { title: '供应商', dataIndex: 'provider_key', key: 'provider_key', width: 120 },
+  { title: '路由模式', dataIndex: 'route_mode', key: 'route_mode', width: 120 },
   { title: '类型', key: 'capability_type', width: 100 },
-  { title: '图片尺寸', dataIndex: 'image_size', key: 'image_size' },
-  { title: '数量', dataIndex: 'image_count', key: 'image_count', width: 70 },
-  { title: '积分', dataIndex: 'points', key: 'points', width: 80 },
   { title: '启用', key: 'enabled', width: 90 },
   { title: '排序', dataIndex: 'sort_order', key: 'sort_order', width: 70 },
   { title: '操作', key: 'action', width: 130, fixed: 'right' as const },
@@ -195,10 +197,20 @@ function capabilityLabel(type: string) {
   return map[type] || type
 }
 
+function routeModeColor(mode: string) {
+  const map: Record<string, string> = { price: 'green', speed: 'orange', success_rate: 'blue' }
+  return map[mode] || 'default'
+}
+
+function routeModeLabel(mode: string) {
+  const map: Record<string, string> = { price: '价格最低', speed: '速度最快', success_rate: '成功率最高' }
+  return map[mode] || mode
+}
+
 async function fetchList() {
   loading.value = true
   try {
-    const res = await getModelPriceList({
+    const res = await getModelConfigList({
       ...filters,
       page: pagination.current,
       page_size: pagination.pageSize,
@@ -208,13 +220,6 @@ async function fetchList() {
   } finally {
     loading.value = false
   }
-}
-
-async function fetchModels() {
-  try {
-    const res = await getModelConfigList({ page_size: 100 })
-    modelList.value = res.items
-  } catch { /* ignore */ }
 }
 
 function handleTableChange(pag: any) {
@@ -227,22 +232,21 @@ function openCreateModal() {
   isEdit.value = false
   editingId.value = 0
   Object.assign(formData, {
-    model_id: undefined,
-    image_size: '', image_count: 1, points: 0,
-    cost_amount: undefined, sort_order: 0, enabled: 1, remark: '',
+    model_key: '', model_name: '', provider_key: 'api_gateway',
+    route_mode: undefined, capability_type: 'image', sort_order: 0, enabled: 1, remark: '',
   })
   modalVisible.value = true
 }
 
-function openEditModal(record: ModelPriceConfig) {
+function openEditModal(record: ModelConfig) {
   isEdit.value = true
   editingId.value = record.id
   Object.assign(formData, {
-    model_id: record.model_id,
-    image_size: record.image_size || '',
-    image_count: record.image_count,
-    points: record.points,
-    cost_amount: record.cost_amount,
+    model_key: record.model_key,
+    model_name: record.model_name,
+    provider_key: record.provider_key,
+    route_mode: record.route_mode,
+    capability_type: record.capability_type,
     sort_order: record.sort_order,
     enabled: record.enabled,
     remark: record.remark || '',
@@ -251,17 +255,17 @@ function openEditModal(record: ModelPriceConfig) {
 }
 
 async function handleSubmit() {
-  if (!formData.model_id || !formData.points) {
+  if (!formData.model_key || !formData.model_name || !formData.provider_key) {
     message.warning('请填写必要字段')
     return
   }
   submitting.value = true
   try {
     if (isEdit.value) {
-      await updateModelPriceConfig(editingId.value, { ...formData })
+      await updateModelConfig(editingId.value, { ...formData })
       message.success('更新成功')
     } else {
-      await createModelPriceConfig({ ...formData } as any)
+      await createModelConfig({ ...formData })
       message.success('创建成功')
     }
     modalVisible.value = false
@@ -273,24 +277,21 @@ async function handleSubmit() {
 
 async function handleDelete(id: number) {
   try {
-    await deleteModelPriceConfig(id)
+    await deleteModelConfig(id)
     message.success('删除成功')
     fetchList()
   } catch { /* interceptor handles error */ }
 }
 
-async function handleToggleEnabled(record: ModelPriceConfig, checked: boolean) {
+async function handleToggleEnabled(record: ModelConfig, checked: boolean) {
   try {
-    await updateModelPriceConfig(record.id, { enabled: checked ? 1 : 0 })
+    await updateModelConfig(record.id, { enabled: checked ? 1 : 0 })
     message.success(checked ? '已启用' : '已禁用')
     fetchList()
   } catch { /* interceptor handles error */ }
 }
 
-onMounted(() => {
-  fetchList()
-  fetchModels()
-})
+onMounted(fetchList)
 </script>
 
 <style scoped>
@@ -303,7 +304,6 @@ onMounted(() => {
 
 .page-header h2 {
   margin: 0;
-  font-size: 18px;
 }
 
 .filter-bar {

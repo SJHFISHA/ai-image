@@ -3,7 +3,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { login as loginApi, register as registerApi, getUserInfo } from '@/api/auth'
+import { login as loginApi, register as registerApi, getUserInfo, uploadAvatar as uploadAvatarApi } from '@/api/auth'
 import type { UserInfo, TokenResult } from '@/api/auth'
 import { message } from 'ant-design-vue'
 import router from '@/router'
@@ -23,11 +23,6 @@ export const useUserStore = defineStore('user', () => {
       token.value = res.access_token
       userInfo.value = res.user
       localStorage.setItem('access_token', res.access_token)
-      // 恢复本地保存的头像
-      const savedAvatar = localStorage.getItem('user_avatar')
-      if (savedAvatar && userInfo.value) {
-        userInfo.value.avatar_url = savedAvatar
-      }
       message.success('登录成功')
       router.push('/')
       return true
@@ -57,23 +52,27 @@ export const useUserStore = defineStore('user', () => {
     try {
       const res = await getUserInfo()
       userInfo.value = res
-      // 恢复本地保存的头像
-      const savedAvatar = localStorage.getItem('user_avatar')
-      if (savedAvatar && userInfo.value) {
-        userInfo.value.avatar_url = savedAvatar
-      }
       return true
     } catch (error) {
       return false
     }
   }
 
-  // 更新头像
-  function updateAvatar(avatarUrl: string) {
-    if (userInfo.value) {
-      userInfo.value.avatar_url = avatarUrl
-      localStorage.setItem('user_avatar', avatarUrl)
+  // 更新头像（上传到七牛云）
+  async function updateAvatar(file: File) {
+    try {
+      const res = await uploadAvatarApi(file)
+      if (userInfo.value) {
+        // 需要重新创建对象才能触发 Vue 响应式更新
+        userInfo.value = {
+          ...userInfo.value,
+          avatar_url: res.avatar_url
+        }
+      }
       message.success('头像更新成功')
+      return true
+    } catch (error) {
+      return false
     }
   }
 

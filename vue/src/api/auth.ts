@@ -35,6 +35,10 @@ export interface RegisterResult {
   user: UserInfo
 }
 
+export interface AvatarUploadResult {
+  avatar_url: string
+}
+
 // 注册
 export function register(data: RegisterParams) {
   return httpPost<RegisterResult>('/auth/register', data)
@@ -48,4 +52,13 @@ export function login(data: LoginParams) {
 // 获取当前用户信息
 export function getUserInfo() {
   return httpGet<UserInfo>('/auth/me')
+}
+
+// 上传头像
+export function uploadAvatar(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return httpPost<AvatarUploadResult>('/auth/avatar', formData, {
+    headers: { 'Content-Type': undefined }
+  })
 }

@@ -113,18 +113,13 @@ function handleAvatarChange(event: Event) {
       alert('请选择图片文件')
       return
     }
-    // 检查文件大小（最大2MB）
-    if (file.size > 2 * 1024 * 1024) {
-      alert('图片大小不能超过2MB')
+    // 检查文件大小（最大50MB）
+    if (file.size > 50 * 1024 * 1024) {
+      alert('图片大小不能超过50MB')
       return
     }
-    // 读取文件并预览
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string
-      userStore.updateAvatar(base64)
-    }
-    reader.readAsDataURL(file)
+    // 上传到后端
+    userStore.updateAvatar(file)
   }
 }
 
@@ -188,7 +183,9 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
           >
             <div class="two-level-sidebar">
               <aside class="primary-sidebar">
-                <div class="brand-mark">✦</div>
+                <div class="brand-mark">
+                  <img src="/favicon.png" alt="logo" class="brand-logo" />
+                </div>
 
                 <nav class="primary-nav">
                   <button
@@ -380,10 +377,15 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #12b5ff;
-  font-size: 24px;
-  font-weight: 700;
   margin-bottom: 140px;
+  overflow: hidden;
+}
+
+.brand-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .primary-nav {

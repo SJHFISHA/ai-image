@@ -19,6 +19,10 @@
         class="sider-menu"
         @click="handleMenuClick"
       >
+        <a-menu-item key="/admin/model-configs">
+          <template #icon><SettingOutlined /></template>
+          <span>模型配置</span>
+        </a-menu-item>
         <a-menu-item key="/admin/model-prices">
           <template #icon><SettingOutlined /></template>
           <span>模型价格配置</span>

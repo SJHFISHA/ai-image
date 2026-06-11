@@ -5,11 +5,12 @@ from typing import Optional
 from datetime import datetime
 from app.utils.timezone import now_beijing_naive
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
 
 from app.models.admin_user import AdminUser
 from app.models.user import User
+from app.models.model_config import ModelConfig
 from app.models.model_price import ModelPriceConfig
 from app.models.recharge import RechargePackage, RechargeOrder
 from app.models.point import UserPointAccount, PointTransaction
@@ -69,6 +70,93 @@ def admin_login(db: Session, username: str, password: str) -> dict:
     }
 
 
+# ======================== 模型配置 CRUD ========================
+
+def get_model_config_list(
+    db: Session,
+    capability_type: Optional[str] = None,
+    keyword: Optional[str] = None,
+    enabled: Optional[int] = None,
+    page: int = 1,
+    page_size: int = 20
+) -> dict:
+    """查询模型配置列表"""
+    query = db.query(ModelConfig)
+
+    if capability_type:
+        query = query.filter(ModelConfig.capability_type == capability_type)
+    if keyword:
+        query = query.filter(
+            ModelConfig.model_key.contains(keyword) |
+            ModelConfig.model_name.contains(keyword)
+        )
+    if enabled is not None:
+        query = query.filter(ModelConfig.enabled == enabled)
+
+    total = query.count()
+    items = query.order_by(
+        ModelConfig.sort_order.asc(),
+        ModelConfig.id.desc()
+    ).offset((page - 1) * page_size).limit(page_size).all()
+
+    return {"total": total, "items": items}
+
+
+def create_model_config(db: Session, data: dict) -> ModelConfig:
+    """创建模型配置"""
+    config = ModelConfig(**data)
+    db.add(config)
+    db.commit()
+    db.refresh(config)
+
+    app_logger.info(f"创建模型配置: id={config.id}, model_key={config.model_key}")
+    return config
+
+
+def update_model_config(db: Session, config_id: int, data: dict) -> ModelConfig:
+    """更新模型配置"""
+    config = db.query(ModelConfig).filter(ModelConfig.id == config_id).first()
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="模型配置不存在"
+        )
+
+    for key, value in data.items():
+        if value is not None:
+            setattr(config, key, value)
+
+    config.updated_at = now_beijing_naive()
+    db.commit()
+    db.refresh(config)
+
+    app_logger.info(f"更新模型配置: id={config_id}")
+    return config
+
+
+def delete_model_config(db: Session, config_id: int):
+    """删除模型配置"""
+    config = db.query(ModelConfig).filter(ModelConfig.id == config_id).first()
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="模型配置不存在"
+        )
+
+    # 检查是否有价格配置关联
+    price_count = db.query(ModelPriceConfig).filter(ModelPriceConfig.model_id == config_id).count()
+    if price_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"该模型下有 {price_count} 个价格配置，请先删除价格配置"
+        )
+
+    db.delete(config)
+    db.commit()
+
+    app_logger.info(f"删除模型配置: id={config_id}")
+
+
 # ======================== 模型价格配置 CRUD ========================
 
 def get_model_price_config_list(
@@ -80,14 +168,18 @@ def get_model_price_config_list(
     page_size: int = 20
 ) -> dict:
     """查询模型价格配置列表"""
-    query = db.query(ModelPriceConfig)
+    query = db.query(ModelPriceConfig).options(
+        joinedload(ModelPriceConfig.model_config)
+    ).join(
+        ModelConfig, ModelPriceConfig.model_id == ModelConfig.id
+    )
 
     if capability_type:
-        query = query.filter(ModelPriceConfig.capability_type == capability_type)
+        query = query.filter(ModelConfig.capability_type == capability_type)
     if keyword:
         query = query.filter(
-            ModelPriceConfig.model_key.contains(keyword) |
-            ModelPriceConfig.model_name.contains(keyword)
+            ModelConfig.model_key.contains(keyword) |
+            ModelConfig.model_name.contains(keyword)
         )
     if enabled is not None:
         query = query.filter(ModelPriceConfig.enabled == enabled)
@@ -103,12 +195,25 @@ def get_model_price_config_list(
 
 def create_model_price_config(db: Session, data: dict) -> ModelPriceConfig:
     """创建模型价格配置"""
+    # 验证 model_id 存在
+    model_config = db.query(ModelConfig).filter(ModelConfig.id == data.get("model_id")).first()
+    if not model_config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="关联的模型配置不存在"
+        )
+
     config = ModelPriceConfig(**data)
     db.add(config)
     db.commit()
     db.refresh(config)
 
-    app_logger.info(f"创建模型价格配置: id={config.id}, model_key={config.model_key}")
+    # 重新查询以加载关联
+    config = db.query(ModelPriceConfig).options(
+        joinedload(ModelPriceConfig.model_config)
+    ).filter(ModelPriceConfig.id == config.id).first()
+
+    app_logger.info(f"创建模型价格配置: id={config.id}, model_id={config.model_id}")
     return config
 
 
@@ -121,6 +226,15 @@ def update_model_price_config(db: Session, config_id: int, data: dict) -> ModelP
             detail="配置不存在"
         )
 
+    # 如果更新 model_id，验证新的 model_id 存在
+    if "model_id" in data and data["model_id"] is not None:
+        model_config = db.query(ModelConfig).filter(ModelConfig.id == data["model_id"]).first()
+        if not model_config:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="关联的模型配置不存在"
+            )
+
     for key, value in data.items():
         if value is not None:
             setattr(config, key, value)
@@ -128,6 +242,11 @@ def update_model_price_config(db: Session, config_id: int, data: dict) -> ModelP
     config.updated_at = now_beijing_naive()
     db.commit()
     db.refresh(config)
+
+    # 重新查询以加载关联
+    config = db.query(ModelPriceConfig).options(
+        joinedload(ModelPriceConfig.model_config)
+    ).filter(ModelPriceConfig.id == config.id).first()
 
     app_logger.info(f"更新模型价格配置: id={config_id}")
     return config

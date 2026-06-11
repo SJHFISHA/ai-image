@@ -3,6 +3,7 @@
 from app.models.user import User
 from app.models.point import UserPointAccount, PointTransaction
 from app.models.recharge import RechargePackage, RechargeOrder
+from app.models.model_config import ModelConfig
 from app.models.model_price import ModelPriceConfig
 from app.models.generation_task import GenerationTask
 from app.models.admin_user import AdminUser
@@ -14,6 +15,7 @@ __all__ = [
     "PointTransaction",
     "RechargePackage",
     "RechargeOrder",
+    "ModelConfig",
     "ModelPriceConfig",
     "GenerationTask",
     "AdminUser",

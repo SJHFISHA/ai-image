@@ -41,3 +41,8 @@ class RegisterResponse(BaseModel):
     """注册成功响应"""
     message: str = Field(default="注册成功", description="提示信息")
     user: UserInfo = Field(..., description="用户信息")
+
+
+class AvatarUploadResponse(BaseModel):
+    """头像上传响应"""
+    avatar_url: str = Field(..., description="头像访问URL")

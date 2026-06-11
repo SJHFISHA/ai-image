@@ -47,23 +47,26 @@ def create_image_task(
     # 3. 在同一事务中冻结积分并创建任务
     try:
         # 冻结积分（不自动提交，由下方统一提交）
+        model_config = price_config.model_config
         point_service.freeze_points(
             db=db,
             user_id=user_id,
             points=price_config.points,
             related_task_id=task_id,
-            remark=f"生图任务冻结积分 - {price_config.model_name}",
+            remark=f"生图任务冻结积分 - {model_config.model_name}",
             auto_commit=False
         )
 
-        # 创建任务记录
+        # 创建任务记录（保存模型快照）
         task = GenerationTask(
             task_id=task_id,
             user_id=user_id,
             price_config_id=price_config.id,
-            model_key=price_config.model_key,
-            model_name=price_config.model_name,
-            capability_type="image",
+            model_key=model_config.model_key,
+            model_name=model_config.model_name,
+            provider_key=model_config.provider_key,
+            route_mode=model_config.route_mode,
+            capability_type=model_config.capability_type,
             image_size=price_config.image_size,
             image_count=price_config.image_count,
             status="pending",
@@ -71,7 +74,10 @@ def create_image_task(
             prompt=prompt,
             request_json={
                 "price_config_id": price_config.id,
-                "model": price_config.model_key,
+                "model_id": model_config.id,
+                "model": model_config.model_key,
+                "provider": model_config.provider_key,
+                "route_mode": model_config.route_mode,
                 "prompt": prompt,
                 "size": price_config.image_size,
                 "count": price_config.image_count,
@@ -82,7 +88,7 @@ def create_image_task(
 
         app_logger.info(
             f"生图任务创建成功: task_id={task_id}, user_id={user_id}, "
-            f"model={price_config.model_key}, points={price_config.points}"
+            f"model={model_config.model_key}, points={price_config.points}"
         )
 
         return task
@@ -113,7 +119,7 @@ def execute_image_generation(
     Returns:
         (success, error_message, result) 三元组
     """
-    from app.providers.api_gateway_provider import api_gateway_provider
+    from app.providers.factory import get_image_provider
     from app.api.routes.image import extract_images_from_api_result
     from app.services import conversation_service
 
@@ -123,16 +129,20 @@ def execute_image_generation(
         task.started_at = now_beijing_naive()
         db.commit()
 
-        app_logger.info(f"开始调用API生图: task_id={task.task_id}")
+        app_logger.info(f"开始调用API生图: task_id={task.task_id}, provider={task.provider_key}")
 
-        # 调用 API 中转站
-        api_result = api_gateway_provider.generate_image(
+        # 根据provider_key获取对应的provider
+        provider = get_image_provider(task.provider_key or "api_gateway")
+
+        # 调用对应的provider生成图片
+        api_result = provider.generate_image(
             model=task.model_key,
             prompt=prompt,
             size=task.image_size or "1024x1024",
             count=task.image_count or 1,
             quality="low",
-            format="jpeg"
+            format="jpeg",
+            route_mode=task.route_mode
         )
 
         # 解析返回结果，提取图片 URL 或 base64

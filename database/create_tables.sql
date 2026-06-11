@@ -150,12 +150,7 @@ CREATE TABLE IF NOT EXISTS recharge_orders (
 CREATE TABLE IF NOT EXISTS model_price_configs (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
 
-    model_key VARCHAR(128) NOT NULL COMMENT '模型标识',
-    model_name VARCHAR(128) NOT NULL COMMENT '前端展示名称',
-
-    capability_type VARCHAR(32) NOT NULL COMMENT '能力类型: image, video, text, audio',
-
-    provider_key VARCHAR(64) NOT NULL DEFAULT 'api_gateway' COMMENT '供应商/中转站标识',
+    model_id BIGINT NOT NULL COMMENT '关联 model_configs.id',
 
     billing_mode VARCHAR(32) NOT NULL DEFAULT 'fixed' COMMENT '计费方式: fixed',
 
@@ -179,62 +174,58 @@ CREATE TABLE IF NOT EXISTS model_price_configs (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
 
     UNIQUE KEY uk_model_price (
-        model_key,
-        capability_type,
+        model_id,
         image_size,
         image_count,
         video_duration,
         video_resolution
     ),
 
-    INDEX idx_capability_enabled (capability_type, enabled),
-    INDEX idx_model_key (model_key)
+    INDEX idx_model_enabled (model_id, enabled),
+    INDEX idx_enabled_sort (enabled, sort_order),
+
+    CONSTRAINT fk_model_price_model
+        FOREIGN KEY (model_id)
+        REFERENCES model_configs(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='模型价格配置表';
 
 
 -- ============================================
 -- 7. 生成任务表
 -- ============================================
-CREATE TABLE IF NOT EXISTS generation_tasks (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-
-    task_id VARCHAR(64) NOT NULL UNIQUE COMMENT '任务ID',
-    user_id BIGINT NOT NULL COMMENT '用户ID',
-
-    price_config_id BIGINT NOT NULL COMMENT '模型价格配置ID',
-
-    model_key VARCHAR(128) NOT NULL COMMENT '模型标识',
-    model_name VARCHAR(128) NOT NULL COMMENT '模型名称',
-    capability_type VARCHAR(32) NOT NULL COMMENT '能力类型: image, video, text, audio',
-
-    image_size VARCHAR(32) DEFAULT NULL COMMENT '图片尺寸',
-    image_count INT DEFAULT NULL COMMENT '图片数量',
-
-    video_duration INT DEFAULT NULL COMMENT '视频时长',
-    video_resolution VARCHAR(32) DEFAULT NULL COMMENT '视频分辨率',
-
-    status VARCHAR(32) NOT NULL DEFAULT 'pending' COMMENT '状态: pending, running, success, failed',
-
-    frozen_points BIGINT NOT NULL DEFAULT 0 COMMENT '冻结积分',
-    consumed_points BIGINT NOT NULL DEFAULT 0 COMMENT '实际消耗积分',
-    refunded_points BIGINT NOT NULL DEFAULT 0 COMMENT '退回积分',
-
-    prompt TEXT DEFAULT NULL COMMENT '用户提示词',
-
-    request_json JSON DEFAULT NULL COMMENT '请求参数',
-    provider_response_json JSON DEFAULT NULL COMMENT '中转站返回原始数据',
-    result_json JSON DEFAULT NULL COMMENT '最终返回给前端的数据',
-
-    error_message TEXT DEFAULT NULL COMMENT '错误信息',
-
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    started_at DATETIME DEFAULT NULL COMMENT '开始执行时间',
-    finished_at DATETIME DEFAULT NULL COMMENT '完成时间',
-
-    INDEX idx_user_id_created_at (user_id, created_at),
-    INDEX idx_status (status),
-    INDEX idx_price_config_id (price_config_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='生成任务表';
+CREATE TABLE `generation_tasks`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `task_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '任务ID',
+  `user_id` bigint NOT NULL COMMENT '用户ID',
+  `price_config_id` bigint NOT NULL COMMENT '模型价格配置ID',
+  `model_key` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模型标识',
+  `model_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模型名称',
+  `capability_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '能力类型: image, video, text, audio',
+  `provider_key` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '供应商标识',
+  `image_size` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '图片尺寸',
+  `image_count` int NULL DEFAULT NULL COMMENT '图片数量',
+  `video_duration` int NULL DEFAULT NULL COMMENT '视频时长',
+  `video_resolution` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '视频分辨率',
+  `status` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending' COMMENT '状态: pending, running, success, failed',
+  `frozen_points` bigint NOT NULL DEFAULT 0 COMMENT '冻结积分',
+  `consumed_points` bigint NOT NULL DEFAULT 0 COMMENT '实际消耗积分',
+  `refunded_points` bigint NOT NULL DEFAULT 0 COMMENT '退回积分',
+  `prompt` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '用户提示词',
+  `request_json` json NULL COMMENT '请求参数',
+  `provider_response_json` json NULL COMMENT '中转站返回原始数据',
+  `result_json` json NULL COMMENT '最终返回给前端的数据',
+  `error_message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '错误信息',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `started_at` datetime NULL DEFAULT NULL COMMENT '开始执行时间',
+  `finished_at` datetime NULL DEFAULT NULL COMMENT '完成时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `task_id`(`task_id` ASC) USING BTREE,
+  INDEX `idx_user_id_created_at`(`user_id` ASC, `created_at` ASC) USING BTREE,
+  INDEX `idx_status`(`status` ASC) USING BTREE,
+  INDEX `idx_price_config_id`(`price_config_id` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 17 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '生成任务表' 
 
 
 -- ============================================
@@ -345,3 +336,27 @@ CREATE TABLE media_assets (
     INDEX idx_message_id (message_id),
     INDEX idx_task_id (task_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='媒体资源表';
+
+-- ============================================
+-- 12. 模型配置表
+-- ============================================
+CREATE TABLE IF NOT EXISTS model_configs (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+
+    model_key VARCHAR(128) NOT NULL COMMENT '真实模型标识，例如 gpt-image-2、gemini-3.1-flash-image-preview',
+    model_name VARCHAR(128) NOT NULL COMMENT '前端展示名称，例如 GPT Image 2、香蕉模型',
+
+    provider_key VARCHAR(64) NOT NULL COMMENT '供应商标识，例如 api_gateway、google_genai',
+    capability_type VARCHAR(32) NOT NULL COMMENT '能力类型: image, video, text, audio',
+
+    enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用: 1=启用, 0=禁用',
+    sort_order INT NOT NULL DEFAULT 0 COMMENT '排序',
+    remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+
+    UNIQUE KEY uk_model_provider (model_key, provider_key),
+    INDEX idx_capability_enabled (capability_type, enabled),
+    INDEX idx_provider_key (provider_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='模型配置表';

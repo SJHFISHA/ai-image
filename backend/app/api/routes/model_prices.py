@@ -40,9 +40,10 @@ def get_model_prices(
     items = [
         ModelPriceConfigResponse(
             id=config.id,
-            model_key=config.model_key,
-            model_name=config.model_name,
-            capability_type=config.capability_type,
+            model_key=config.model_config.model_key,
+            model_name=config.model_config.model_name,
+            provider_key=config.model_config.provider_key,
+            capability_type=config.model_config.capability_type,
             image_size=config.image_size,
             image_count=config.image_count,
             video_duration=config.video_duration,

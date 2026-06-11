@@ -1,7 +1,7 @@
 """
 认证相关路由
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -12,7 +12,8 @@ from app.schemas.auth import (
     LoginRequest,
     TokenResponse,
     RegisterResponse,
-    UserInfo
+    UserInfo,
+    AvatarUploadResponse
 )
 from app.schemas.common import ApiResponse
 from app.services import auth_service
@@ -43,7 +44,7 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
             id=user.id,
             username=user.username,
             nickname=user.nickname,
-            avatar_url=user.avatar_url,
+            avatar_url=auth_service.get_avatar_url(user.avatar_url),
             available_points=0
         )
     )
@@ -94,13 +95,42 @@ def get_me(current_user: User = Depends(get_current_user),db: Session = Depends(
         id=current_user.id,
         username=current_user.username,
         nickname=current_user.nickname,
-        avatar_url=current_user.avatar_url,
+        avatar_url=auth_service.get_avatar_url(current_user.avatar_url),
         available_points=point_balance.get("balance_points", 0)
     )
 
     return ApiResponse(
         code=0,
         message="success",
+        data=response_data,
+        success=True
+    )
+
+
+@router.post("/avatar", response_model=ApiResponse[AvatarUploadResponse], summary="上传用户头像")
+async def upload_avatar(
+    file: UploadFile = File(..., description="头像图片文件"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    上传用户头像
+
+    - 支持格式：JPG、PNG、WebP、GIF
+    - 最大大小：2MB
+    - 需要在请求头中携带: Authorization: Bearer <token>
+    """
+    avatar_url = await auth_service.upload_avatar(
+        db=db,
+        user_id=current_user.id,
+        file=file
+    )
+
+    response_data = AvatarUploadResponse(avatar_url=avatar_url)
+
+    return ApiResponse(
+        code=0,
+        message="头像上传成功",
         data=response_data,
         success=True
     )

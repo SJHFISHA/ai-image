@@ -23,9 +23,41 @@ export interface AdminLoginResult {
   admin: AdminInfo
 }
 
+// 模型配置
+export interface ModelConfig {
+  id: number
+  model_key: string
+  model_name: string
+  provider_key: string
+  route_mode?: string
+  capability_type: string
+  enabled: number
+  sort_order: number
+  remark?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ModelConfigCreateParams {
+  model_key: string
+  model_name: string
+  provider_key: string
+  route_mode?: string
+  capability_type: string
+  enabled?: number
+  sort_order?: number
+  remark?: string
+}
+
+export interface ModelConfigListResult {
+  total: number
+  items: ModelConfig[]
+}
+
 // 模型价格配置
 export interface ModelPriceConfig {
   id: number
+  model_id: number
   model_key: string
   model_name: string
   capability_type: string
@@ -46,10 +78,7 @@ export interface ModelPriceConfig {
 }
 
 export interface ModelPriceConfigCreateParams {
-  model_key: string
-  model_name: string
-  capability_type: string
-  provider_key?: string
+  model_id: number
   billing_mode?: string
   image_size?: string
   image_count?: number
@@ -173,6 +202,29 @@ export function adminLogin(data: AdminLoginParams) {
 
 export function getAdminInfo() {
   return httpGet<AdminInfo>('/admin/auth/me')
+}
+
+// 模型配置
+export function getModelConfigList(params?: {
+  capability_type?: string
+  keyword?: string
+  enabled?: number
+  page?: number
+  page_size?: number
+}) {
+  return httpGet<ModelConfigListResult>('/admin/model-configs', { params })
+}
+
+export function createModelConfig(data: ModelConfigCreateParams) {
+  return httpPost<ModelConfig>('/admin/model-configs', data)
+}
+
+export function updateModelConfig(id: number, data: Partial<ModelConfigCreateParams>) {
+  return httpPut<ModelConfig>(`/admin/model-configs/${id}`, data)
+}
+
+export function deleteModelConfig(id: number) {
+  return httpDelete(`/admin/model-configs/${id}`)
 }
 
 // 模型价格配置

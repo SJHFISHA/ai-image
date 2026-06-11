@@ -3,10 +3,11 @@
 """
 from typing import Optional, List
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
 
 from app.models.model_price import ModelPriceConfig
+from app.models.model_config import ModelConfig
 from app.utils.logger import app_logger
 
 
@@ -26,15 +27,25 @@ def get_model_price_configs(
     Returns:
         模型价格配置列表
     """
-    query = db.query(ModelPriceConfig)
+    query = db.query(ModelPriceConfig).options(
+        joinedload(ModelPriceConfig.model_config)
+    ).join(
+        ModelConfig, ModelPriceConfig.model_id == ModelConfig.id
+    )
 
     if capability_type:
-        query = query.filter(ModelPriceConfig.capability_type == capability_type)
+        query = query.filter(ModelConfig.capability_type == capability_type)
 
     if enabled_only:
-        query = query.filter(ModelPriceConfig.enabled == 1)
+        query = query.filter(
+            ModelConfig.enabled == 1,
+            ModelPriceConfig.enabled == 1
+        )
 
-    configs = query.order_by(ModelPriceConfig.sort_order).all()
+    configs = query.order_by(
+        ModelConfig.sort_order,
+        ModelPriceConfig.sort_order
+    ).all()
 
     return configs
 
@@ -55,13 +66,18 @@ def get_model_price_config_by_id(
     Returns:
         模型价格配置对象，如果不存在返回None
     """
-    query = db.query(ModelPriceConfig).filter(
+    query = db.query(ModelPriceConfig).options(
+        joinedload(ModelPriceConfig.model_config)
+    ).join(
+        ModelConfig, ModelPriceConfig.model_id == ModelConfig.id
+    ).filter(
         ModelPriceConfig.id == config_id,
-        ModelPriceConfig.enabled == 1
+        ModelPriceConfig.enabled == 1,
+        ModelConfig.enabled == 1
     )
 
     if capability_type:
-        query = query.filter(ModelPriceConfig.capability_type == capability_type)
+        query = query.filter(ModelConfig.capability_type == capability_type)
 
     return query.first()
 

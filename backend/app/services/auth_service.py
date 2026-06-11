@@ -6,13 +6,14 @@ from datetime import datetime
 from app.utils.timezone import now_beijing_naive
 
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, UploadFile
 
 from app.models.user import User
 from app.models.point import UserPointAccount
 from app.core.security import hash_password, verify_password, create_access_token
 from app.utils.validators import validate_username, validate_password
 from app.utils.logger import app_logger
+from app.providers.qiniu_provider import qiniu_provider
 
 
 def register_user(
@@ -163,7 +164,7 @@ def login_user(
             "id": user.id,
             "username": user.username,
             "nickname": user.nickname,
-            "avatar_url": user.avatar_url
+            "avatar_url": get_avatar_url(user.avatar_url)
         }
     }
 
@@ -180,3 +181,98 @@ def get_user_info(db: Session, user_id: int) -> Optional[User]:
         用户对象，如果不存在返回None
     """
     return db.query(User).filter(User.id == user_id).first()
+
+
+def get_avatar_url(avatar_key: Optional[str]) -> Optional[str]:
+    """
+    将头像key转换为可访问的签名URL
+
+    Args:
+        avatar_key: 头像在七牛云的object key
+
+    Returns:
+        签名URL，如果key为空返回None
+    """
+    if not avatar_key:
+        return None
+    return qiniu_provider.build_access_url(avatar_key)
+
+
+# 允许的头像文件类型
+ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+# 最大头像文件大小（50MB）
+MAX_AVATAR_SIZE = 50 * 1024 * 1024
+
+
+async def upload_avatar(db: Session, user_id: int, file: UploadFile) -> str:
+    """
+    上传用户头像到七牛云
+
+    Args:
+        db: 数据库Session
+        user_id: 用户ID
+        file: 上传的文件
+
+    Returns:
+        头像访问URL
+
+    Raises:
+        HTTPException: 文件校验失败或上传失败时抛出异常
+    """
+    # 校验文件类型
+    if file.content_type not in ALLOWED_AVATAR_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="不支持的图片格式，仅支持 JPG、PNG、WebP、GIF"
+        )
+
+    # 读取文件内容并校验大小
+    content = await file.read()
+    if len(content) > MAX_AVATAR_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="图片大小不能超过2MB"
+        )
+
+    # 确定文件后缀
+    suffix_map = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+        "image/gif": ".gif"
+    }
+    suffix = suffix_map.get(file.content_type, ".png")
+
+    # 生成object key
+    timestamp = int(datetime.now().timestamp() * 1000)
+    object_key = f"avatars/user_{user_id}/{timestamp}{suffix}"
+
+    try:
+        # 上传到七牛云
+        result = qiniu_provider.upload_bytes(content, object_key, suffix)
+
+        # 更新数据库
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用户不存在"
+            )
+
+        user.avatar_url = object_key
+        db.commit()
+
+        # 返回签名URL（bucket是私有的，需要签名才能访问）
+        access_url = qiniu_provider.build_access_url(object_key)
+        app_logger.info(f"用户头像上传成功: user_id={user_id}, key={object_key}")
+        return access_url
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        app_logger.error(f"用户头像上传失败: user_id={user_id}, error={str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="头像上传失败，请稍后重试"
+        )

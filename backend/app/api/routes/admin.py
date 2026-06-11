@@ -14,6 +14,10 @@ from app.schemas.admin import (
     AdminLoginRequest,
     AdminLoginResponse,
     AdminInfo,
+    ModelConfigCreateRequest,
+    ModelConfigUpdateRequest,
+    ModelConfigDetailResponse,
+    ModelConfigListResponse,
     ModelPriceConfigCreateRequest,
     ModelPriceConfigUpdateRequest,
     ModelPriceConfigDetailResponse,
@@ -83,6 +87,73 @@ def get_admin_me(current_admin: AdminUser = Depends(get_current_admin_user)):
     )
 
 
+# ======================== 模型配置 CRUD ========================
+
+@router.get("/model-configs", response_model=ApiResponse[ModelConfigListResponse], summary="查询模型配置列表")
+def get_model_configs(
+    capability_type: Optional[str] = Query(None, description="能力类型筛选"),
+    keyword: Optional[str] = Query(None, description="搜索关键词（模型标识/名称）"),
+    enabled: Optional[int] = Query(None, description="启用状态筛选"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    current_admin: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """查询模型配置列表"""
+    result = admin_service.get_model_config_list(
+        db=db,
+        capability_type=capability_type,
+        keyword=keyword,
+        enabled=enabled,
+        page=page,
+        page_size=page_size
+    )
+
+    items = [ModelConfigDetailResponse.model_validate(item) for item in result["items"]]
+    response_data = ModelConfigListResponse(total=result["total"], items=items)
+    return ApiResponse(data=response_data)
+
+
+@router.post("/model-configs", response_model=ApiResponse[ModelConfigDetailResponse], summary="创建模型配置")
+def create_model_config(
+    request: ModelConfigCreateRequest,
+    current_admin: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """创建模型配置"""
+    config = admin_service.create_model_config(db=db, data=request.model_dump())
+    response_data = ModelConfigDetailResponse.model_validate(config)
+    return ApiResponse(code=0, message="创建成功", data=response_data)
+
+
+@router.put("/model-configs/{config_id}", response_model=ApiResponse[ModelConfigDetailResponse], summary="更新模型配置")
+def update_model_config(
+    config_id: int,
+    request: ModelConfigUpdateRequest,
+    current_admin: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """更新模型配置"""
+    config = admin_service.update_model_config(
+        db=db,
+        config_id=config_id,
+        data=request.model_dump(exclude_unset=True)
+    )
+    response_data = ModelConfigDetailResponse.model_validate(config)
+    return ApiResponse(code=0, message="更新成功", data=response_data)
+
+
+@router.delete("/model-configs/{config_id}", response_model=ApiResponse, summary="删除模型配置")
+def delete_model_config(
+    config_id: int,
+    current_admin: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """删除模型配置"""
+    admin_service.delete_model_config(db=db, config_id=config_id)
+    return ApiResponse(code=0, message="删除成功")
+
+
 # ======================== 模型价格配置 CRUD ========================
 
 @router.get("/model-prices", response_model=ApiResponse[ModelPriceConfigListResponse], summary="查询模型价格配置列表")
@@ -105,7 +176,30 @@ def get_model_price_configs(
         page_size=page_size
     )
 
-    items = [ModelPriceConfigDetailResponse.model_validate(item) for item in result["items"]]
+    items = [
+        ModelPriceConfigDetailResponse(
+            id=item.id,
+            model_id=item.model_id,
+            model_key=item.model_config.model_key,
+            model_name=item.model_config.model_name,
+            capability_type=item.model_config.capability_type,
+            provider_key=item.model_config.provider_key,
+            billing_mode=item.billing_mode,
+            image_size=item.image_size,
+            image_count=item.image_count,
+            video_duration=item.video_duration,
+            video_resolution=item.video_resolution,
+            points=item.points,
+            cost_amount=item.cost_amount,
+            cost_currency=item.cost_currency,
+            enabled=item.enabled,
+            sort_order=item.sort_order,
+            remark=item.remark,
+            created_at=item.created_at,
+            updated_at=item.updated_at
+        )
+        for item in result["items"]
+    ]
     response_data = ModelPriceConfigListResponse(total=result["total"], items=items)
     return ApiResponse(data=response_data)
 
@@ -118,7 +212,27 @@ def create_model_price_config(
 ):
     """创建模型价格配置"""
     config = admin_service.create_model_price_config(db=db, data=request.model_dump())
-    response_data = ModelPriceConfigDetailResponse.model_validate(config)
+    response_data = ModelPriceConfigDetailResponse(
+        id=config.id,
+        model_id=config.model_id,
+        model_key=config.model_config.model_key,
+        model_name=config.model_config.model_name,
+        capability_type=config.model_config.capability_type,
+        provider_key=config.model_config.provider_key,
+        billing_mode=config.billing_mode,
+        image_size=config.image_size,
+        image_count=config.image_count,
+        video_duration=config.video_duration,
+        video_resolution=config.video_resolution,
+        points=config.points,
+        cost_amount=config.cost_amount,
+        cost_currency=config.cost_currency,
+        enabled=config.enabled,
+        sort_order=config.sort_order,
+        remark=config.remark,
+        created_at=config.created_at,
+        updated_at=config.updated_at
+    )
     return ApiResponse(code=0, message="创建成功", data=response_data)
 
 
@@ -135,7 +249,27 @@ def update_model_price_config(
         config_id=config_id,
         data=request.model_dump(exclude_unset=True)
     )
-    response_data = ModelPriceConfigDetailResponse.model_validate(config)
+    response_data = ModelPriceConfigDetailResponse(
+        id=config.id,
+        model_id=config.model_id,
+        model_key=config.model_config.model_key,
+        model_name=config.model_config.model_name,
+        capability_type=config.model_config.capability_type,
+        provider_key=config.model_config.provider_key,
+        billing_mode=config.billing_mode,
+        image_size=config.image_size,
+        image_count=config.image_count,
+        video_duration=config.video_duration,
+        video_resolution=config.video_resolution,
+        points=config.points,
+        cost_amount=config.cost_amount,
+        cost_currency=config.cost_currency,
+        enabled=config.enabled,
+        sort_order=config.sort_order,
+        remark=config.remark,
+        created_at=config.created_at,
+        updated_at=config.updated_at
+    )
     return ApiResponse(code=0, message="更新成功", data=response_data)
 
 

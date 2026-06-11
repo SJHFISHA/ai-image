@@ -211,4 +211,41 @@ function goTo(path: string) {
 .action-icon {
   font-size: 22px;
 }
+
+/* 暗黑模式样式 */
+[data-theme='dark'] .user-nickname {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+[data-theme='dark'] .user-username {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+[data-theme='dark'] .stat-card {
+  background: #1f1f1f;
+  border-color: #303030;
+}
+
+[data-theme='dark'] .stat-card :deep(.ant-statistic-title) {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+[data-theme='dark'] .stat-card :deep(.ant-statistic-content) {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+[data-theme='dark'] .section-title {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+[data-theme='dark'] .action-card {
+  background: #1f1f1f;
+  border-color: #303030;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+[data-theme='dark'] .action-card:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+}
 </style>

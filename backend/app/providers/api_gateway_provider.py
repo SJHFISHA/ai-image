@@ -2,12 +2,19 @@
 API中转站调用模块
 """
 import requests
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from app.core.config import settings
 from app.providers.base import BaseProvider
 from app.utils.logger import app_logger
 
+
+# 路由模式后缀映射
+ROUTE_SUFFIX_MAP = {
+    "price": ":floor",
+    "speed": ":nitro",
+    "success_rate": ":stable",
+}
 
 
 class ApiGatewayProvider(BaseProvider):
@@ -24,6 +31,30 @@ class ApiGatewayProvider(BaseProvider):
             "Authorization": f"Bearer {self.api_key}"
         }
 
+    def _apply_route_suffix(self, model: str, route_mode: Optional[str] = None) -> str:
+        """
+        根据路由模式为模型名添加后缀
+
+        Args:
+            model: 原始模型标识
+            route_mode: 路由模式 (price, speed, success_rate)
+
+        Returns:
+            添加后缀后的模型标识
+        """
+        if not route_mode:
+            return model
+
+        suffix = ROUTE_SUFFIX_MAP.get(route_mode)
+        if not suffix:
+            return model
+
+        # 如果已经有路由后缀，不再添加
+        if model.endswith(":floor") or model.endswith(":nitro") or model.endswith(":stable"):
+            return model
+
+        return f"{model}{suffix}"
+
     def generate_image(
         self,
         model: str,
@@ -32,6 +63,7 @@ class ApiGatewayProvider(BaseProvider):
         count: int = 1,
         quality: str = "low",
         format: str = "jpeg",
+        route_mode: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -44,6 +76,7 @@ class ApiGatewayProvider(BaseProvider):
             count: 生成数量
             quality: 图片质量 (low, medium, high, auto)
             format: 图片格式 (jpeg, png)
+            route_mode: 路由模式 (price, speed, success_rate)
 
         Returns:
             API返回的原始响应
@@ -53,8 +86,11 @@ class ApiGatewayProvider(BaseProvider):
         """
         url = f"{self.base_url}/v1/images/generations"
 
+        # 应用路由后缀
+        routed_model = self._apply_route_suffix(model, route_mode)
+
         payload = {
-            "model": model,
+            "model": routed_model,
             "prompt": prompt,
             "n": count,
             "size": size,
@@ -62,10 +98,11 @@ class ApiGatewayProvider(BaseProvider):
             "format": format
         }
 
-        # 合并额外参数
+        # 合并额外参数（排除已处理的参数）
+        kwargs.pop('route_mode', None)
         payload.update(kwargs)
 
-        app_logger.info(f"调用API中转站生图: model={model}, size={size}, count={count}")
+        app_logger.info(f"调用API中转站生图: model={routed_model}, size={size}, count={count}, route_mode={route_mode}")
 
         try:
             session = requests.Session()
@@ -85,7 +122,7 @@ class ApiGatewayProvider(BaseProvider):
 
             result = response.json()
 
-            app_logger.info(f"API中转站生图成功: model={model}")
+            app_logger.info(f"API中转站生图成功: model={routed_model}")
             return result
 
         except requests.RequestException as e:

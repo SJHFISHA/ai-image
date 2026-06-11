@@ -10,6 +10,7 @@ class ModelPriceConfigResponse(BaseModel):
     price_config_id: int = Field(..., alias="id", description="价格配置ID")
     model_key: str = Field(..., description="模型标识")
     model_name: str = Field(..., description="模型名称")
+    provider_key: str = Field(..., description="供应商标识")
     capability_type: str = Field(..., description="能力类型")
     image_size: Optional[str] = Field(None, description="图片尺寸")
     image_count: Optional[int] = Field(None, description="图片数量")

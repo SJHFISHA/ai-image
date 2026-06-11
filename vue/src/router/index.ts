@@ -64,6 +64,11 @@ const router = createRouter({
           redirect: '/admin/model-prices'
         },
         {
+          path: 'model-configs',
+          name: 'admin-model-configs',
+          component: () => import('@/views/admin/ModelConfigView.vue')
+        },
+        {
           path: 'model-prices',
           name: 'admin-model-prices',
           component: () => import('@/views/admin/ModelPriceView.vue')
