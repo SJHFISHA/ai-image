@@ -3,7 +3,7 @@ FROM node:22-bookworm-slim AS frontend-builder
 WORKDIR /frontend
 
 COPY vue/package*.json ./
-RUN npm ci
+RUN RUN npm install
 
 COPY vue/ ./
 RUN npm run build
