@@ -233,7 +233,8 @@ function openCreateModal() {
   editingId.value = 0
   Object.assign(formData, {
     model_key: '', model_name: '', provider_key: 'api_gateway',
-    route_mode: undefined, capability_type: 'image', sort_order: 0, enabled: 1, remark: '',
+    route_mode: undefined, capability_type: 'image',
+    sort_order: 0, enabled: 1, remark: '',
   })
   modalVisible.value = true
 }

@@ -274,8 +274,9 @@ const selectedModel = ref('')
 const modelOpen = ref(false)
 function handleModelMenu({ key }: { key: string | number }) {
   selectedModel.value = key as string
-  // 切换模型后重置分辨率和数量
+  // 切换模型后重置分辨率、宽高比和数量
   selectedResolution.value = availableResolutions.value[0] || ''
+  selectedAspectRatio.value = availableAspectRatios.value[0] || ''
   selectedCount.value = String(availableCounts.value[0] || 1)
   modelOpen.value = false
 }
@@ -293,14 +294,37 @@ const selectedResolution = ref('')
 const resolutionOpen = ref(false)
 function handleResolutionMenu({ key }: { key: string | number }) {
   selectedResolution.value = key as string
+  // 重置宽高比和数量
+  selectedAspectRatio.value = availableAspectRatios.value[0] || ''
   selectedCount.value = String(availableCounts.value[0] || 1)
   resolutionOpen.value = false
 }
 
-// 根据当前模型和分辨率联动可用数量
+// 根据当前模型和分辨率联动可用宽高比
+const availableAspectRatios = computed(() => {
+  const ratios = priceConfigs.value
+    .filter(item => item.model_key === selectedModel.value && item.image_size === selectedResolution.value)
+    .map(item => item.aspect_ratio)
+    .filter((r): r is string => !!r)
+  return [...new Set(ratios)]
+})
+
+const selectedAspectRatio = ref('')
+const aspectRatioOpen = ref(false)
+function handleAspectRatioMenu({ key }: { key: string | number }) {
+  selectedAspectRatio.value = key as string
+  selectedCount.value = String(availableCounts.value[0] || 1)
+  aspectRatioOpen.value = false
+}
+
+// 根据当前模型、分辨率和宽高比联动可用数量
 const availableCounts = computed(() => {
   const counts = priceConfigs.value
-    .filter(item => item.model_key === selectedModel.value && item.image_size === selectedResolution.value)
+    .filter(item =>
+      item.model_key === selectedModel.value &&
+      item.image_size === selectedResolution.value &&
+      item.aspect_ratio === selectedAspectRatio.value
+    )
     .map(item => item.image_count)
     .filter((c): c is number => !!c)
   return [...new Set(counts)].sort((a, b) => a - b)
@@ -318,6 +342,7 @@ const selectedPriceConfig = computed(() =>
   priceConfigs.value.find(item =>
     item.model_key === selectedModel.value &&
     item.image_size === selectedResolution.value &&
+    item.aspect_ratio === selectedAspectRatio.value &&
     Number(item.image_count) === Number(selectedCount.value)
   )
 )
@@ -332,6 +357,7 @@ async function loadModelPrices() {
     if (first) {
       selectedModel.value = first.model_key
       selectedResolution.value = first.image_size || ''
+      selectedAspectRatio.value = first.aspect_ratio || ''
       selectedCount.value = String(first.image_count || 1)
     }
   } catch {
@@ -549,6 +575,19 @@ onMounted(() => {
           <template #overlay>
             <a-menu>
               <a-menu-item v-for="item in availableResolutions" :key="item" @click="handleResolutionMenu({ key: item })">
+                {{ item }}
+              </a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+
+        <a-dropdown v-model:open="aspectRatioOpen" :trigger="['click']">
+          <button class="toolbar-btn">
+            {{ selectedAspectRatio || '宽高比' }}
+          </button>
+          <template #overlay>
+            <a-menu>
+              <a-menu-item v-for="item in availableAspectRatios" :key="item" @click="handleAspectRatioMenu({ key: item })">
                 {{ item }}
               </a-menu-item>
             </a-menu>
@@ -983,11 +1022,11 @@ onMounted(() => {
 
 .chat-result-image {
   width: 100%;
-  aspect-ratio: 1 / 1;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 28px;
   background: #f5f5f5;
+  max-height: 600px;
 }
 
 .image-preview-mask {

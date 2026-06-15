@@ -45,6 +45,8 @@ class ModelConfigCreateRequest(BaseModel):
     enabled: int = Field(1, description="是否启用: 1=启用, 0=禁用")
     sort_order: int = Field(0, description="排序")
     remark: Optional[str] = Field(None, max_length=255, description="备注")
+    class Config:
+        protected_namespaces = ()
 
 
 class ModelConfigUpdateRequest(BaseModel):
@@ -57,6 +59,8 @@ class ModelConfigUpdateRequest(BaseModel):
     enabled: Optional[int] = Field(None, description="是否启用")
     sort_order: Optional[int] = Field(None, description="排序")
     remark: Optional[str] = Field(None, max_length=255, description="备注")
+    class Config:
+        protected_namespaces = ()
 
 
 class ModelConfigDetailResponse(BaseModel):
@@ -75,6 +79,7 @@ class ModelConfigDetailResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        protected_namespaces = ()
 
 
 class ModelConfigListResponse(BaseModel):
@@ -91,6 +96,7 @@ class ModelPriceConfigCreateRequest(BaseModel):
     billing_mode: str = Field("fixed", max_length=32, description="计费方式")
     image_size: Optional[str] = Field(None, max_length=32, description="图片尺寸")
     image_count: int = Field(1, ge=1, description="生成图片数量")
+    aspect_ratio: Optional[str] = Field(None, max_length=16, description="宽高比，例如 1:1, 16:9, 9:16")
     video_duration: Optional[int] = Field(None, ge=1, description="视频时长")
     video_resolution: Optional[str] = Field(None, max_length=32, description="视频分辨率")
     points: int = Field(..., ge=0, description="用户消耗积分")
@@ -99,6 +105,8 @@ class ModelPriceConfigCreateRequest(BaseModel):
     enabled: int = Field(1, description="是否启用: 1=启用, 0=禁用")
     sort_order: int = Field(0, description="排序")
     remark: Optional[str] = Field(None, max_length=255, description="备注")
+    class Config:
+        protected_namespaces = ()
 
 
 class ModelPriceConfigUpdateRequest(BaseModel):
@@ -107,6 +115,7 @@ class ModelPriceConfigUpdateRequest(BaseModel):
     billing_mode: Optional[str] = Field(None, max_length=32, description="计费方式")
     image_size: Optional[str] = Field(None, max_length=32, description="图片尺寸")
     image_count: Optional[int] = Field(None, ge=1, description="生成图片数量")
+    aspect_ratio: Optional[str] = Field(None, max_length=16, description="宽高比，例如 1:1, 16:9, 9:16")
     video_duration: Optional[int] = Field(None, ge=1, description="视频时长")
     video_resolution: Optional[str] = Field(None, max_length=32, description="视频分辨率")
     points: Optional[int] = Field(None, ge=0, description="用户消耗积分")
@@ -115,6 +124,8 @@ class ModelPriceConfigUpdateRequest(BaseModel):
     enabled: Optional[int] = Field(None, description="是否启用")
     sort_order: Optional[int] = Field(None, description="排序")
     remark: Optional[str] = Field(None, max_length=255, description="备注")
+    class Config:
+        protected_namespaces = ()
 
 
 class ModelPriceConfigDetailResponse(BaseModel):
@@ -128,6 +139,7 @@ class ModelPriceConfigDetailResponse(BaseModel):
     billing_mode: str = Field(..., description="计费方式")
     image_size: Optional[str] = Field(None, description="图片尺寸")
     image_count: int = Field(..., description="生成图片数量")
+    aspect_ratio: Optional[str] = Field(None, description="宽高比")
     video_duration: Optional[int] = Field(None, description="视频时长")
     video_resolution: Optional[str] = Field(None, description="视频分辨率")
     points: int = Field(..., description="用户消耗积分")
@@ -141,6 +153,7 @@ class ModelPriceConfigDetailResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        protected_namespaces = ()
 
 
 class ModelPriceConfigListResponse(BaseModel):
@@ -351,6 +364,7 @@ class AdminTaskDetailResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        protected_namespaces = ()
 
 
 class AdminTaskListResponse(BaseModel):

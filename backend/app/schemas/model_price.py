@@ -14,6 +14,7 @@ class ModelPriceConfigResponse(BaseModel):
     capability_type: str = Field(..., description="能力类型")
     image_size: Optional[str] = Field(None, description="图片尺寸")
     image_count: Optional[int] = Field(None, description="图片数量")
+    aspect_ratio: Optional[str] = Field(None, description="宽高比")
     video_duration: Optional[int] = Field(None, description="视频时长")
     video_resolution: Optional[str] = Field(None, description="视频分辨率")
     points: int = Field(..., description="消耗积分")

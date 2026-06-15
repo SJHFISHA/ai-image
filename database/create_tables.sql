@@ -156,6 +156,7 @@ CREATE TABLE IF NOT EXISTS model_price_configs (
 
     image_size VARCHAR(32) DEFAULT NULL COMMENT '图片尺寸，例如 1024x1024',
     image_count INT DEFAULT 1 COMMENT '生成图片数量',
+    aspect_ratio VARCHAR(16) DEFAULT NULL COMMENT '宽高比，例如 1:1, 16:9, 9:16',
 
     video_duration INT DEFAULT NULL COMMENT '视频时长，单位秒',
     video_resolution VARCHAR(32) DEFAULT NULL COMMENT '视频分辨率',
@@ -204,8 +205,10 @@ CREATE TABLE `generation_tasks`  (
   `model_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模型名称',
   `capability_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '能力类型: image, video, text, audio',
   `provider_key` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '供应商标识',
+  `route_mode` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '路由模式',
   `image_size` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '图片尺寸',
   `image_count` int NULL DEFAULT NULL COMMENT '图片数量',
+  `aspect_ratio` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '宽高比',
   `video_duration` int NULL DEFAULT NULL COMMENT '视频时长',
   `video_resolution` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '视频分辨率',
   `status` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending' COMMENT '状态: pending, running, success, failed',
@@ -225,7 +228,7 @@ CREATE TABLE `generation_tasks`  (
   INDEX `idx_user_id_created_at`(`user_id` ASC, `created_at` ASC) USING BTREE,
   INDEX `idx_status`(`status` ASC) USING BTREE,
   INDEX `idx_price_config_id`(`price_config_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 17 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '生成任务表' 
+) ENGINE = InnoDB AUTO_INCREMENT = 21 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '生成任务表' ROW_FORMAT = Dynamic;
 
 
 -- ============================================

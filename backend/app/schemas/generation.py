@@ -31,6 +31,7 @@ class TaskDetailResponse(BaseModel):
     capability_type: str = Field(..., description="能力类型")
     image_size: Optional[str] = Field(None, description="图片尺寸")
     image_count: Optional[int] = Field(None, description="图片数量")
+    aspect_ratio: Optional[str] = Field(None, description="宽高比")
     prompt: Optional[str] = Field(None, description="提示词")
     frozen_points: int = Field(..., description="冻结积分")
     consumed_points: int = Field(..., description="消耗积分")
@@ -62,6 +63,8 @@ class AssetItemResponse(BaseModel):
     prompt: Optional[str] = Field(None, description="提示词")
     model_name: Optional[str] = Field(None, description="模型名称")
     created_at: datetime = Field(..., description="创建时间")
+    class Config:
+        protected_namespaces = ()
 
 
 class AssetListResponse(BaseModel):

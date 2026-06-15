@@ -8,6 +8,7 @@ const columns = [
   { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 170 },
   { title: '模型', dataIndex: 'model_name', key: 'model_name', width: 130 },
   { title: '尺寸', dataIndex: 'image_size', key: 'image_size', width: 110 },
+  { title: '宽高比', dataIndex: 'aspect_ratio', key: 'aspect_ratio', width: 80 },
   { title: '数量', dataIndex: 'image_count', key: 'image_count', width: 70, align: 'center' as const },
   { title: '提示词', dataIndex: 'prompt', key: 'prompt', ellipsis: true },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
@@ -151,6 +152,10 @@ onMounted(() => {
         <div class="detail-row">
           <span class="detail-label">尺寸：</span>
           <span>{{ detailTask.image_size || '-' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">宽高比：</span>
+          <span>{{ detailTask.aspect_ratio || '-' }}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">数量：</span>

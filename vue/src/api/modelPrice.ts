@@ -11,6 +11,7 @@ export interface ModelPriceItem {
   capability_type: string
   image_size?: string
   image_count?: number
+  aspect_ratio?: string
   video_duration?: number
   video_resolution?: string
   points: number

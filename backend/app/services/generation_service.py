@@ -69,6 +69,7 @@ def create_image_task(
             capability_type=model_config.capability_type,
             image_size=price_config.image_size,
             image_count=price_config.image_count,
+            aspect_ratio=price_config.aspect_ratio,
             status="pending",
             frozen_points=price_config.points,
             prompt=prompt,
@@ -81,6 +82,7 @@ def create_image_task(
                 "prompt": prompt,
                 "size": price_config.image_size,
                 "count": price_config.image_count,
+                "aspect_ratio": price_config.aspect_ratio,
             }
         )
         db.add(task)
@@ -142,7 +144,9 @@ def execute_image_generation(
             count=task.image_count or 1,
             quality="low",
             format="jpeg",
-            route_mode=task.route_mode
+            route_mode=task.route_mode,
+            aspect_ratio=task.aspect_ratio,
+            image_size=task.image_size
         )
 
         # 解析返回结果，提取图片 URL 或 base64

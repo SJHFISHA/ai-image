@@ -27,6 +27,7 @@ export interface TaskDetailResult {
   capability_type: string
   image_size?: string
   image_count?: number
+  aspect_ratio?: string
   prompt?: string
   frozen_points: number
   consumed_points: number

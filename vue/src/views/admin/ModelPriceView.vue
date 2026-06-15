@@ -51,6 +51,9 @@
       size="middle"
     >
       <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'aspect_ratio'">
+          <span>{{ record.aspect_ratio || '-' }}</span>
+        </template>
         <template v-if="column.key === 'capability_type'">
           <a-tag :color="capabilityColor(record.capability_type)">
             {{ capabilityLabel(record.capability_type) }}
@@ -94,7 +97,20 @@
           />
         </a-form-item>
         <a-form-item label="图片尺寸">
-          <a-input v-model:value="formData.image_size" placeholder="如 1024x1024" />
+          <a-select v-model:value="formData.image_size" allow-clear placeholder="请选择分辨率">
+            <a-select-option value="1K">1K</a-select-option>
+            <a-select-option value="2K">2K</a-select-option>
+            <a-select-option value="4K">4K</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="宽高比">
+          <a-select v-model:value="formData.aspect_ratio" allow-clear placeholder="请选择宽高比">
+            <a-select-option value="1:1">1:1 (正方形)</a-select-option>
+            <a-select-option value="16:9">16:9 (横屏)</a-select-option>
+            <a-select-option value="9:16">9:16 (竖屏)</a-select-option>
+            <a-select-option value="4:3">4:3 (传统比例)</a-select-option>
+            <a-select-option value="3:4">3:4 (竖屏比例)</a-select-option>
+          </a-select>
         </a-form-item>
         <a-form-item label="图片数量">
           <a-input-number v-model:value="formData.image_count" :min="1" style="width: 100%" />
@@ -156,8 +172,9 @@ const pagination = reactive({
 
 const formData = reactive({
   model_id: undefined as number | undefined,
-  image_size: '',
+  image_size: undefined as string | undefined,
   image_count: 1,
+  aspect_ratio: undefined as string | undefined,
   points: 0,
   cost_amount: undefined as number | undefined,
   sort_order: 0,
@@ -178,6 +195,7 @@ const columns = [
   { title: '展示名称', dataIndex: 'model_name', key: 'model_name' },
   { title: '类型', key: 'capability_type', width: 100 },
   { title: '图片尺寸', dataIndex: 'image_size', key: 'image_size' },
+  { title: '宽高比', dataIndex: 'aspect_ratio', key: 'aspect_ratio', width: 80 },
   { title: '数量', dataIndex: 'image_count', key: 'image_count', width: 70 },
   { title: '积分', dataIndex: 'points', key: 'points', width: 80 },
   { title: '启用', key: 'enabled', width: 90 },
@@ -228,7 +246,9 @@ function openCreateModal() {
   editingId.value = 0
   Object.assign(formData, {
     model_id: undefined,
-    image_size: '', image_count: 1, points: 0,
+    image_size: undefined, image_count: 1,
+    aspect_ratio: undefined,
+    points: 0,
     cost_amount: undefined, sort_order: 0, enabled: 1, remark: '',
   })
   modalVisible.value = true
@@ -239,8 +259,9 @@ function openEditModal(record: ModelPriceConfig) {
   editingId.value = record.id
   Object.assign(formData, {
     model_id: record.model_id,
-    image_size: record.image_size || '',
+    image_size: record.image_size,
     image_count: record.image_count,
+    aspect_ratio: record.aspect_ratio,
     points: record.points,
     cost_amount: record.cost_amount,
     sort_order: record.sort_order,

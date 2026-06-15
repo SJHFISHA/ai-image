@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { ConfigProvider, Layout, Menu, Dropdown, Tooltip } from 'ant-design-vue'
+import { ConfigProvider, Layout, Menu, Dropdown, Tooltip, Popconfirm, message } from 'ant-design-vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { getConversationList } from '@/api/conversation'
+import { getConversationList, deleteConversation } from '@/api/conversation'
 import type { ConversationItem } from '@/api/conversation'
 import {
   EditOutlined,
@@ -21,6 +21,7 @@ import {
   FileImageOutlined,
   BellOutlined,
   ClockCircleOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons-vue'
 import type { MenuTheme } from 'ant-design-vue'
 
@@ -52,9 +53,37 @@ function openSession(session: ConversationItem) {
   router.push({ path: '/image-generate', query: { session_id: session.session_id } })
 }
 
+async function handleDeleteSession(sessionId: string, event: Event) {
+  event.stopPropagation()
+  try {
+    await deleteConversation(sessionId)
+    message.success('删除成功')
+    await loadHistory()
+    // 如果删除的是当前正在查看的会话，跳转到新对话页面
+    if (route.query.session_id === sessionId) {
+      router.replace({ path: '/image-generate', query: {} })
+    }
+  } catch {
+    message.error('删除失败')
+  }
+}
+
 function handleNewChat() {
   selectedKeys.value = ['new-chat']
-  router.push('/image-generate')
+  // 检查当前是否已经在 /image-generate 页面
+  if (route.path === '/image-generate' && !route.query.session_id) {
+    // 如果已经在新对话页面，使用 window.location.reload() 刷新页面
+    window.location.reload()
+  } else {
+    // 否则使用 replace 清除 session_id 参数
+    router.replace({ path: '/image-generate', query: {} })
+  }
+}
+
+function handleMenuSelect({ key }: { key: string | number }) {
+  if (key === 'new-chat') {
+    handleNewChat()
+  }
 }
 
 // 判断是否为登录/注册页或管理员页面，这些页面不显示用户侧边栏
@@ -277,9 +306,9 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
                     mode="inline"
                     :theme="siderTheme"
                     class="secondary-menu"
-                    @select="({ key }) => (selectedKeys = [String(key)])"
+                    @select="handleMenuSelect"
                   >
-                    <Menu.Item key="new-chat">
+                    <Menu.Item key="new-chat" @click="handleNewChat">
                       <template #icon>
                         <EditOutlined />
                       </template>
@@ -302,6 +331,14 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
                       <span class="recent-text" :title="session.title || session.last_message_preview">
                         {{ session.title || session.last_message_preview || '未命名会话' }}
                       </span>
+                      <Popconfirm
+                        title="确定删除此会话？"
+                        ok-text="确定"
+                        cancel-text="取消"
+                        @confirm="(e: Event) => handleDeleteSession(session.session_id, e)"
+                      >
+                        <DeleteOutlined class="recent-delete-icon" @click.stop />
+                      </Popconfirm>
                     </button>
                   </div>
                 </template>
@@ -646,6 +683,21 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
   color: rgba(0, 0, 0, 0.35);
 }
 
+.recent-delete-icon {
+  margin-left: auto;
+  color: rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.recent-item:hover .recent-delete-icon {
+  opacity: 1;
+}
+
+.recent-delete-icon:hover {
+  color: #ff4d4f;
+}
+
 .history-loading,
 .history-empty {
   font-size: 12px;
@@ -701,6 +753,14 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
 [data-theme='dark'] .recent-item:hover,
 [data-theme='dark'] .secondary-menu .ant-menu-item-selected {
   background: #262626;
+}
+
+[data-theme='dark'] .recent-delete-icon {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme='dark'] .recent-delete-icon:hover {
+  color: #ff4d4f;
 }
 
 [data-theme='dark'] .points-pill {

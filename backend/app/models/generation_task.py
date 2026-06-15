@@ -31,6 +31,7 @@ class GenerationTask(Base):
 
     image_size: Mapped[Optional[str]] = mapped_column(String(32), comment="图片尺寸")
     image_count: Mapped[Optional[int]] = mapped_column(Integer, comment="图片数量")
+    aspect_ratio: Mapped[Optional[str]] = mapped_column(String(16), comment="宽高比")
 
     video_duration: Mapped[Optional[int]] = mapped_column(Integer, comment="视频时长")
     video_resolution: Mapped[Optional[str]] = mapped_column(String(32), comment="视频分辨率")

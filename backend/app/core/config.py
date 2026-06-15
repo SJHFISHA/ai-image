@@ -31,10 +31,6 @@ class Settings(BaseSettings):
     QINIU_PRIVATE_BUCKET: bool = False
     QINIU_PRIVATE_URL_EXPIRES: int = 3600
 
-    # Google GenAI 配置
-    GOOGLE_GENAI_API_KEY: str = ""
-    GOOGLE_GENAI_API_ENDPOINT: str = "https://api.jiguangmanying.xyz"
-
     # 项目配置
     APP_NAME: str = "AI创作平台"
     APP_VERSION: str = "1.0.0"
