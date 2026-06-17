@@ -12,6 +12,18 @@ class ImageGenerateRequest(BaseModel):
     price_config_id: int = Field(..., description="模型价格配置ID")
     prompt: str = Field(..., min_length=1, max_length=2000, description="提示词")
 
+class ImageEditRequest(BaseModel):
+    """图片编辑任务创建请求"""
+    session_id: Optional[str] = Field(None, description="会话ID")
+    price_config_id: int = Field(..., description="模型价格配置ID")
+    prompt: str = Field(..., min_length=1, max_length=2000, description="编辑提示词")
+    image_url: str = Field(..., min_length=1, max_length=2048, description="参考图片URL")
+
+
+class ReferenceImageUploadResponse(BaseModel):
+    """参考图片上传响应"""
+    asset_id: str = Field(..., description="资源ID")
+    url: str = Field(..., description="图片URL")
 
 class TaskCreateResponse(BaseModel):
     """任务创建成功响应"""

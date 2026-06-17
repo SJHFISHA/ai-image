@@ -17,6 +17,7 @@
         @change="fetchList"
       >
         <a-select-option value="image">图片生成</a-select-option>
+        <a-select-option value="image_edit">图片编辑</a-select-option>
         <a-select-option value="video">视频生成</a-select-option>
         <a-select-option value="text">文本生成</a-select-option>
         <a-select-option value="audio">音频生成</a-select-option>
@@ -112,6 +113,7 @@
         <a-form-item label="能力类型" required>
           <a-select v-model:value="formData.capability_type">
             <a-select-option value="image">图片生成</a-select-option>
+            <a-select-option value="image_edit">图片编辑</a-select-option>
             <a-select-option value="video">视频生成</a-select-option>
             <a-select-option value="text">文本生成</a-select-option>
             <a-select-option value="audio">音频生成</a-select-option>
@@ -188,12 +190,12 @@ const columns = [
 ]
 
 function capabilityColor(type: string) {
-  const map: Record<string, string> = { image: 'blue', video: 'purple', text: 'green', audio: 'orange' }
+  const map: Record<string, string> = { image: 'blue', image_edit: 'cyan', video: 'purple', text: 'green', audio: 'orange' }
   return map[type] || 'default'
 }
 
 function capabilityLabel(type: string) {
-  const map: Record<string, string> = { image: '图片', video: '视频', text: '文本', audio: '音频' }
+  const map: Record<string, string> = { image: '图片生成', image_edit: '图片编辑', video: '视频', text: '文本', audio: '音频' }
   return map[type] || type
 }
 

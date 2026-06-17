@@ -29,6 +29,7 @@ class GoogleGenAIProvider(BaseProvider):
         """
         将数据库配置映射到 Gemini API 参数
 
+
         Args:
             aspect_ratio: 宽高比，如 "1:1", "16:9"
             image_size: 分辨率，如 "1K", "2K", "4K"
@@ -157,6 +158,104 @@ class GoogleGenAIProvider(BaseProvider):
         app_logger.info(f"Gemini REST API 生图成功: model={model}, count={len(images)}")
 
         return {"data": images}
+
+    def _apply_route_suffix(self, model: str, route_mode: Optional[str] = None) -> str:
+        suffix_map = {
+            "price": ":floor",
+            "speed": ":nitro",
+            "success_rate": ":stable",
+        }
+
+        suffix = suffix_map.get(route_mode or "")
+        if not suffix:
+            return model
+
+        if model.endswith(":floor") or model.endswith(":nitro") or model.endswith(":stable"):
+            return model
+
+        return f"{model}{suffix}"
+
+    def edit_image(
+        self,
+        model: str,
+        prompt: str,
+        image_url: str,
+        route_mode: Optional[str] = None,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        **kwargs
+    ) -> Dict[str, Any]:
+        if not self.api_key:
+            raise ValueError("API_GATEWAY_API_KEY is not configured")
+
+        routed_model = self._apply_route_suffix(model, route_mode)
+        url = f"{self.api_endpoint}/v1/chat/completions"
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}",
+        }
+
+        payload = {
+            "model": routed_model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": image_url}},
+                    ],
+                }
+            ],
+            "stream": False,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+
+        session = requests.Session()
+        session.trust_env = False
+
+        response = session.post(url, headers=headers, json=payload, timeout=180)
+
+        if response.status_code >= 400:
+            error_msg = f"Gemini image edit failed: {response.status_code} - {response.text}"
+            app_logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+        result = response.json()
+        images = self._extract_images_from_chat_result(result)
+
+        if not images:
+            raise RuntimeError(f"Gemini image edit did not return image data: {result}")
+
+        return {"data": images}
+
+    def _extract_images_from_chat_result(self, result: Dict[str, Any]) -> list[dict]:
+        images = []
+
+        for choice in result.get("choices", []):
+            message = choice.get("message", {})
+            content = message.get("content")
+
+            if isinstance(content, list):
+                for part in content:
+                    if not isinstance(part, dict):
+                        continue
+
+                    image_url = part.get("image_url")
+                    if isinstance(image_url, dict) and image_url.get("url"):
+                        images.append({"url": image_url["url"]})
+
+                    if part.get("type") in {"image", "output_image"} and part.get("image"):
+                        images.append({"b64_json": part["image"]})
+
+            elif isinstance(content, str):
+                if content.startswith("data:image/"):
+                    images.append({"b64_json": content})
+                elif content.startswith("http://") or content.startswith("https://"):
+                    images.append({"url": content})
+
+        return images
 
     def generate_video(
         self,

@@ -13,7 +13,7 @@ import {
 import { useUserStore } from '@/stores/user'
 import { getModelPrices } from '@/api/modelPrice'
 import type { ModelPriceItem } from '@/api/modelPrice'
-import { createImageTask, getTaskDetail } from '@/api/generation'
+import { createImageTask, createImageEditTask, uploadReferenceImage, getTaskDetail } from '@/api/generation'
 import { getConversationDetail } from '@/api/conversation'
 import type { ConversationMessage } from '@/api/conversation'
 
@@ -23,6 +23,13 @@ const router = useRouter()
 const currentSessionId = ref<string | null>(null)
 const historyMessages = ref<ConversationMessage[]>([])
 const inputText = ref('')
+const selectedReferenceFile = ref<File | null>(null)
+const selectedReferencePreview = ref('')
+function revokeReferencePreview() {
+  if (selectedReferencePreview.value) {
+    URL.revokeObjectURL(selectedReferencePreview.value)
+  }
+}
 const sending = ref(false)
 const generatedImages = ref<string[]>([])
 const previewImage = ref('')
@@ -138,6 +145,11 @@ async function handleSend() {
 
   if (sending.value) return
 
+  if (selectedMode.value === 'edit' && !selectedReferenceFile.value) {
+    message.warning('请先上传需要编辑的图片')
+    return
+  }
+
   // 检查是否已选择有效配置
   if (!selectedPriceConfig.value) {
     message.error('当前模型/分辨率/数量组合不可用，请重新选择')
@@ -151,11 +163,23 @@ async function handleSend() {
 
   try {
     // 创建生图任务
-    const taskRes = await createImageTask({
-      session_id: currentSessionId.value || undefined,
-      price_config_id: selectedPriceConfig.value.id,
-      prompt: inputText.value
-    })
+    let taskRes
+
+    if (selectedMode.value === 'edit') {
+      const uploadRes = await uploadReferenceImage(selectedReferenceFile.value as File)
+      taskRes = await createImageEditTask({
+        session_id: currentSessionId.value || undefined,
+        price_config_id: selectedPriceConfig.value.id,
+        prompt: inputText.value,
+        image_url: uploadRes.url,
+      })
+    } else {
+      taskRes = await createImageTask({
+        session_id: currentSessionId.value || undefined,
+        price_config_id: selectedPriceConfig.value.id,
+        prompt: inputText.value,
+      })
+    }
 
     // 如果后端创建了新会话，更新当前 session_id 并同步 URL
     if (!currentSessionId.value && taskRes.session_id) {
@@ -185,6 +209,9 @@ async function handleSend() {
     }
 
     inputText.value = ''
+    selectedReferenceFile.value = null
+    revokeReferencePreview()
+    selectedReferencePreview.value = ''
   } catch (error: unknown) {
     const errorMessage =
       error &&
@@ -237,6 +264,7 @@ function clearPolling() {
 
 onUnmounted(() => {
   clearPolling()
+  revokeReferencePreview()
 })
 
 function handleKeyDown(e: KeyboardEvent) {
@@ -258,6 +286,47 @@ const agentModeOpen = ref(false)
 function handleAgentModeMenu({ key }: { key: string | number }) {
   selectedMode.value = key as string
   agentModeOpen.value = false
+
+  if (selectedMode.value !== 'edit') {
+    selectedReferenceFile.value = null
+    revokeReferencePreview()
+    selectedReferencePreview.value = ''
+  }
+
+  loadModelPrices()
+}
+
+function handleReferenceFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  if (!file.type.startsWith('image/')) {
+    message.warning('请选择图片文件')
+    return
+  }
+
+  if (file.size > 10 * 1024 * 1024) {
+    message.warning('图片不能超过 10MB')
+    return
+  }
+
+  revokeReferencePreview()
+  selectedReferenceFile.value = file
+  selectedReferencePreview.value = URL.createObjectURL(file)
+  selectedMode.value = 'edit'
+  loadModelPrices()
+}
+
+function removeReferenceImage() {
+  selectedReferenceFile.value = null
+  revokeReferencePreview()
+  selectedReferencePreview.value = ''
+
+  if (selectedMode.value === 'edit') {
+    selectedMode.value = 'image'
+    loadModelPrices()
+  }
 }
 
 // ======================== 后端动态配置 ========================
@@ -350,7 +419,7 @@ const selectedPriceConfig = computed(() =>
 // 加载模型价格配置
 async function loadModelPrices() {
   try {
-    const res = await getModelPrices('image')
+    const res = await getModelPrices(selectedMode.value === 'edit' ? 'image_edit' : 'image')
     priceConfigs.value = res.items || []
     // 默认选中第一个
     const first = priceConfigs.value.at(0)
@@ -381,6 +450,19 @@ onMounted(() => {
       <template v-for="msg in historyMessages" :key="msg.message_id">
         <div v-if="msg.role === 'user'" class="user-row">
           <div class="user-bubble-wrap">
+            <button
+              v-if="msg.metadata_json?.reference_image_url"
+              class="reference-history-btn"
+              type="button"
+              @click="openImagePreview(msg.metadata_json.reference_image_url)"
+            >
+              <img
+                :src="msg.metadata_json.reference_image_url"
+                class="reference-history-image"
+                alt="参考图"
+              />
+            </button>
+
             <div
               class="user-bubble"
               :class="{ expanded: isHistoryMessageExpanded(msg.message_id) }"
@@ -528,9 +610,10 @@ onMounted(() => {
     </div>
     <div class="input-card">
       <div class="input-area">
-        <div class="upload-btn">
+        <label class="upload-btn">
           <PlusOutlined />
-        </div>
+          <input class="upload-input" type="file" accept="image/*" @change="handleReferenceFileChange" @click="($event.target as HTMLInputElement).value = ''" />
+        </label>
         <textarea
           v-model="inputText"
           class="input-text"
@@ -538,6 +621,10 @@ onMounted(() => {
           rows="2"
           @keydown="handleKeyDown"
         ></textarea>
+        <div v-if="selectedReferencePreview" class="reference-preview">
+          <img :src="selectedReferencePreview" alt="参考图" />
+          <button type="button" class="reference-remove" @click="removeReferenceImage">×</button>
+        </div>
       </div>
 
       <div class="toolbar">
@@ -716,6 +803,59 @@ onMounted(() => {
   transition: all 0.2s;
   color: #999;
   font-size: 16px;
+}
+
+.upload-input {
+  display: none;
+}
+
+.reference-preview {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #f5f5f5;
+}
+
+.reference-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.reference-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+  line-height: 18px;
+  padding: 0;
+}
+
+.reference-history-btn {
+  width: 96px;
+  height: 96px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: zoom-in;
+  background: transparent;
+}
+
+.reference-history-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .upload-btn:hover {

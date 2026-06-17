@@ -1,12 +1,4 @@
 -- ============================================
--- AI创作平台数据库建表脚本
--- ============================================
-
--- 创建数据库（如果不存在）
--- CREATE DATABASE IF NOT EXISTS ai_creation_platform DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
--- USE ai_creation_platform;
-
--- ============================================
 -- 1. 用户表
 -- ============================================
 CREATE TABLE IF NOT EXISTS users (
@@ -142,6 +134,31 @@ CREATE TABLE IF NOT EXISTS recharge_orders (
     INDEX idx_user_id_created_at (user_id, created_at),
     INDEX idx_pay_status (pay_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='充值订单表';
+
+
+-- ============================================
+-- . 模型配置表
+-- ============================================
+CREATE TABLE IF NOT EXISTS model_configs (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+
+    model_key VARCHAR(128) NOT NULL COMMENT '真实模型标识，例如 gpt-image-2、gemini-3.1-flash-image-preview',
+    model_name VARCHAR(128) NOT NULL COMMENT '前端展示名称，例如 GPT Image 2、香蕉模型',
+
+    provider_key VARCHAR(64) NOT NULL COMMENT '供应商标识，例如 api_gateway、google_genai',
+    capability_type VARCHAR(32) NOT NULL COMMENT '能力类型: image, video, text, audio',
+
+    enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用: 1=启用, 0=禁用',
+    sort_order INT NOT NULL DEFAULT 0 COMMENT '排序',
+    remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+
+    UNIQUE KEY uk_model_provider (model_key, provider_key),
+    INDEX idx_capability_enabled (capability_type, enabled),
+    INDEX idx_provider_key (provider_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='模型配置表';
 
 
 -- ============================================
@@ -340,26 +357,3 @@ CREATE TABLE media_assets (
     INDEX idx_task_id (task_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='媒体资源表';
 
--- ============================================
--- 12. 模型配置表
--- ============================================
-CREATE TABLE IF NOT EXISTS model_configs (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-
-    model_key VARCHAR(128) NOT NULL COMMENT '真实模型标识，例如 gpt-image-2、gemini-3.1-flash-image-preview',
-    model_name VARCHAR(128) NOT NULL COMMENT '前端展示名称，例如 GPT Image 2、香蕉模型',
-
-    provider_key VARCHAR(64) NOT NULL COMMENT '供应商标识，例如 api_gateway、google_genai',
-    capability_type VARCHAR(32) NOT NULL COMMENT '能力类型: image, video, text, audio',
-
-    enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用: 1=启用, 0=禁用',
-    sort_order INT NOT NULL DEFAULT 0 COMMENT '排序',
-    remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
-
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-
-    UNIQUE KEY uk_model_provider (model_key, provider_key),
-    INDEX idx_capability_enabled (capability_type, enabled),
-    INDEX idx_provider_key (provider_key)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='模型配置表';

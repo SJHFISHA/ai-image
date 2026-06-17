@@ -100,6 +100,67 @@ def create_image_task(
         app_logger.error(f"生图任务创建失败: {str(e)}")
         raise
 
+def create_image_edit_task(
+    db: Session,
+    user_id: int,
+    price_config_id: int,
+    prompt: str,
+    image_url: str,
+) -> GenerationTask:
+    price_config = model_price_service.validate_model_price_config(
+        db, price_config_id, capability_type="image_edit"
+    )
+
+    task_id = generate_task_id("IMG")
+
+    try:
+        model_config = price_config.model_config
+        point_service.freeze_points(
+            db=db,
+            user_id=user_id,
+            points=price_config.points,
+            related_task_id=task_id,
+            remark=f"图片编辑任务冻结积分 - {model_config.model_name}",
+            auto_commit=False,
+        )
+
+        task = GenerationTask(
+            task_id=task_id,
+            user_id=user_id,
+            price_config_id=price_config.id,
+            model_key=model_config.model_key,
+            model_name=model_config.model_name,
+            provider_key=model_config.provider_key,
+            route_mode=model_config.route_mode,
+            capability_type=model_config.capability_type,
+            image_size=price_config.image_size,
+            image_count=price_config.image_count,
+            aspect_ratio=price_config.aspect_ratio,
+            status="pending",
+            frozen_points=price_config.points,
+            prompt=prompt,
+            request_json={
+                "mode": "image_edit",
+                "price_config_id": price_config.id,
+                "model_id": model_config.id,
+                "model": model_config.model_key,
+                "provider": model_config.provider_key,
+                "route_mode": model_config.route_mode,
+                "prompt": prompt,
+                "image_url": image_url,
+                "size": price_config.image_size,
+                "count": price_config.image_count,
+                "aspect_ratio": price_config.aspect_ratio,
+            },
+        )
+        db.add(task)
+        db.commit()
+        return task
+
+    except Exception:
+        db.rollback()
+        raise
+
 
 def execute_image_generation(
     db: Session,
@@ -291,6 +352,186 @@ def execute_image_generation_by_task_id(
             )
         else:
             app_logger.error(f"异步执行生图任务失败: 任务不存在 task_id={task_id}")
+    finally:
+        db.close()
+
+def execute_image_edit(
+        db: Session,
+        task: GenerationTask,
+        prompt: str,
+        image_url: str,
+        session_id: Optional[str] = None,
+        assistant_message_id: Optional[str] = None,
+) -> tuple[bool, Optional[str], Optional[dict]]:
+    """
+    执行生图任务
+
+    Args:
+        db: 数据库Session
+        task: 任务对象
+        prompt: 提示词
+        session_id: 会话ID（用于写历史）
+        assistant_message_id: assistant消息ID（用于更新历史）
+
+    Returns:
+        (success, error_message, result) 三元组
+    """
+    from app.providers.factory import get_image_provider
+    from app.api.routes.image import extract_images_from_api_result
+    from app.services import conversation_service
+
+    try:
+        # 更新任务状态为运行中，记录开始时间
+        task.status = "running"
+        task.started_at = now_beijing_naive()
+        db.commit()
+
+        app_logger.info(f"开始调用API生图: task_id={task.task_id}, provider={task.provider_key}")
+
+        # 根据provider_key获取对应的provider
+        provider = get_image_provider(task.provider_key or "api_gateway")
+
+        # 调用对应的provider生成图片
+        if not hasattr(provider, "edit_image"):
+            raise Exception(f"当前供应商不支持图片编辑: {task.provider_key}")
+
+        api_result = provider.edit_image(
+            model=task.model_key,
+            prompt=prompt,
+            image_url=image_url,
+            route_mode=task.route_mode,
+        )
+
+        # 解析返回结果，提取图片 URL 或 base64
+        images = extract_images_from_api_result(api_result)
+
+        if not images:
+            raise Exception(f"API未返回图片数据，原始返回: {api_result}")
+
+        # 上传到七牛云，数据库只保存公开访问 URL
+        from app.services import storage_service
+
+        uploaded_assets = storage_service.upload_generated_media_list(
+            values=images,
+            user_id=task.user_id,
+            task_id=task.task_id,
+            media_type="image",
+        )
+
+        image_urls = [asset["url"] for asset in uploaded_assets]
+
+        # 构建最终结果：只给前端和数据库保存可访问 URL
+        result = {
+            "images": image_urls,
+            "assets": uploaded_assets,
+        }
+
+        # 成功结算
+        settle_task_success(
+            db,
+            task.task_id,
+            result,
+            provider_response=sanitize_provider_response(api_result),
+        )
+        task.status = "success"
+
+        # 写入独立资产表：无论是否有关联会话，生成成功后都记录资产
+        created_media_assets = []
+        for asset_info in uploaded_assets:
+            created_media_assets.append(
+                conversation_service.create_media_asset(
+                    db=db,
+                    user_id=task.user_id,
+                    url=asset_info["url"],
+                    media_type="image",
+                    session_id=session_id,
+                    message_id=assistant_message_id,
+                    task_id=task.task_id,
+                    provider="qiniu",
+                    bucket=asset_info.get("bucket"),
+                    object_key=asset_info.get("key"),
+                    mime_type=asset_info.get("mime_type"),
+                    file_size=asset_info.get("file_size"),
+                    width=asset_info.get("width"),
+                    height=asset_info.get("height"),
+                )
+            )
+
+        # ========== 写入对话历史 ==========
+        if session_id and assistant_message_id:
+            # 更新 assistant 消息状态为 success
+            conversation_service.update_message_status(
+                db=db,
+                message_id=assistant_message_id,
+                status_val="success",
+                content_text=f"编辑生成了 {len(images)} 张图片",
+                metadata_json={
+                    "model": task.model_key,
+                    "image_size": task.image_size,
+                    "image_count": task.image_count,
+                    "consumed_points": task.frozen_points,
+                },
+            )
+
+
+            # 更新会话预览
+            conversation_service.update_session_preview(
+                db=db,
+                session_id=session_id,
+                preview=f"编辑生成了 {len(images)} 张图片",
+            )
+
+        app_logger.info(f"生图成功: task_id={task.task_id}, images={len(images)}")
+
+        return True, None, result
+
+    except Exception as e:
+        error_msg = str(e)
+        app_logger.error(f"生图失败: task_id={task.task_id}, error={error_msg}")
+
+        # 失败结算，退回积分
+        settle_task_failed(db, task.task_id, error_msg)
+        task.status = "failed"
+
+        # ========== 更新对话历史（失败） ==========
+        if session_id and assistant_message_id:
+            from app.services import conversation_service
+            conversation_service.update_message_status(
+                db=db,
+                message_id=assistant_message_id,
+                status_val="failed",
+                content_text=f"图片编辑失败: {error_msg}",
+                metadata_json={"error": error_msg},
+            )
+            conversation_service.update_session_preview(
+                db=db,
+                session_id=session_id,
+                preview=f"图片编辑失败: {error_msg[:80]}",
+            )
+
+        return False, error_msg, None
+
+def execute_image_edit_by_task_id(
+    task_id: str,
+    prompt: str,
+    image_url: str,
+    session_id: Optional[str] = None,
+    assistant_message_id: Optional[str] = None,
+):
+    from app.db.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        task = get_task_by_id(db, task_id)
+        if task:
+            execute_image_edit(
+                db=db,
+                task=task,
+                prompt=prompt,
+                image_url=image_url,
+                session_id=session_id,
+                assistant_message_id=assistant_message_id,
+            )
     finally:
         db.close()
 

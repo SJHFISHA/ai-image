@@ -1,7 +1,7 @@
 """
 生图相关路由
 """
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks, UploadFile, File, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -9,7 +9,9 @@ from app.core.deps import get_current_user
 from app.models.user import User
 from app.schemas.generation import (
     ImageGenerateRequest,
-    TaskCreateResponse
+    ImageEditRequest,
+    TaskCreateResponse,
+    ReferenceImageUploadResponse,
 )
 from app.schemas.common import ApiResponse
 from app.services import generation_service, conversation_service
@@ -87,6 +89,46 @@ def extract_images_from_api_result(api_result) -> list[str]:
 
     return images
 
+@router.post("/upload-reference", response_model=ApiResponse[ReferenceImageUploadResponse], summary="上传参考图片")
+async def upload_reference_image(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    allowed_types = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="仅支持 PNG、JPG、JPEG、WEBP 图片",
+        )
+
+    data = await file.read()
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="图片不能超过 10MB",
+        )
+
+    from app.services import storage_service
+
+    uploaded = storage_service.upload_reference_image_bytes(
+        data=data,
+        user_id=current_user.id,
+        filename=file.filename or "reference.png",
+        mime_type=file.content_type,
+    )
+
+
+
+    return ApiResponse(
+        code=0,
+        message="上传成功",
+        data=ReferenceImageUploadResponse(
+            asset_id="",
+            url=uploaded["url"],
+        ),
+        success=True,
+    )
 
 @router.post("/generate", response_model=ApiResponse[TaskCreateResponse], summary="创建生图任务")
 def create_image_task(
@@ -192,4 +234,86 @@ def create_image_task(
             session_id=conversation.session_id,
         ),
         success=True
+    )
+
+@router.post("/edit", response_model=ApiResponse[TaskCreateResponse], summary="创建图片编辑任务")
+def create_image_edit_task(
+    request: ImageEditRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    conversation, session_is_new = conversation_service.get_or_create_session(
+        db=db,
+        user_id=current_user.id,
+        session_id=request.session_id,
+        session_type="image",
+        title=request.prompt[:50] if request.prompt else None,
+    )
+
+    user_message = conversation_service.create_message(
+        db=db,
+        session_id=conversation.session_id,
+        user_id=current_user.id,
+        role="user",
+        content_type="mixed",
+        content_text=request.prompt,
+        metadata_json={"reference_image_url": request.image_url},
+    )
+
+    try:
+        task = generation_service.create_image_edit_task(
+            db=db,
+            user_id=current_user.id,
+            price_config_id=request.price_config_id,
+            prompt=request.prompt,
+            image_url=request.image_url,
+        )
+    except Exception:
+        try:
+            db.delete(user_message)
+            if session_is_new:
+                db.delete(conversation)
+            db.commit()
+        except Exception:
+            db.rollback()
+        raise
+
+    assistant_message = conversation_service.create_message(
+        db=db,
+        session_id=conversation.session_id,
+        user_id=current_user.id,
+        role="assistant",
+        content_type="image",
+        content_text=None,
+        task_id=task.task_id,
+        status_val="running",
+    )
+
+    conversation_service.update_session_preview(
+        db=db,
+        session_id=conversation.session_id,
+        preview=f"编辑图片: {request.prompt[:100]}",
+    )
+
+    background_tasks.add_task(
+        generation_service.execute_image_edit_by_task_id,
+        task.task_id,
+        request.prompt,
+        request.image_url,
+        session_id=conversation.session_id,
+        assistant_message_id=assistant_message.message_id,
+    )
+
+    return ApiResponse(
+        code=0,
+        message="任务已提交",
+        data=TaskCreateResponse(
+            task_id=task.task_id,
+            status="running",
+            frozen_points=task.frozen_points,
+            error_message=None,
+            session_id=conversation.session_id,
+        ),
+        success=True,
     )

@@ -119,6 +119,49 @@ def build_object_key(
         f"{task_id}_{index}{clean_suffix}"
     )
 
+def build_reference_object_key(
+    *,
+    user_id: int,
+    filename: str,
+    suffix: str,
+) -> str:
+    now = now_beijing_naive()
+    clean_suffix = suffix if suffix.startswith(".") else f".{suffix}"
+
+    return (
+        f"ai-reference/image/"
+        f"{now:%Y/%m/%d}/"
+        f"user_{user_id}/"
+        f"{int(now.timestamp() * 1000)}{clean_suffix}"
+    )
+
+
+def upload_reference_image_bytes(
+    *,
+    data: bytes,
+    user_id: int,
+    filename: str,
+    mime_type: Optional[str],
+) -> dict:
+    suffix = _guess_suffix(mime_type, "image", source_url=filename)
+
+    key = build_reference_object_key(
+        user_id=user_id,
+        filename=filename,
+        suffix=suffix,
+    )
+
+    upload_result = qiniu_provider.upload_bytes(data, key, suffix=suffix)
+
+    return {
+        "url": qiniu_provider.build_access_url(upload_result["key"]),
+        "key": upload_result["key"],
+        "hash": upload_result.get("hash"),
+        "mime_type": mime_type,
+        "media_type": "image",
+        "file_size": len(data),
+    }
+
 
 def upload_generated_media(
     *,

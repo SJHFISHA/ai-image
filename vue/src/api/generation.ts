@@ -10,6 +10,31 @@ export interface CreateImageTaskParams {
   prompt: string
 }
 
+export function uploadReferenceImage(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  return httpPost<UploadReferenceImageResult>('/image/upload-reference', formData, {
+    headers: { 'Content-Type': undefined },
+  })
+}
+
+export function createImageEditTask(data: CreateImageEditTaskParams) {
+  return httpPost<TaskCreateResult>('/image/edit', data)
+}
+
+export interface CreateImageEditTaskParams {
+  session_id?: string
+  price_config_id: number
+  prompt: string
+  image_url: string
+}
+
+export interface UploadReferenceImageResult {
+  asset_id: string
+  url: string
+}
+
 // 响应数据类型
 export interface TaskCreateResult {
   task_id: string
