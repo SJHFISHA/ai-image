@@ -88,14 +88,34 @@ class QiniuProvider:
         q = self._auth()
         token = q.upload_token(self.bucket, key, 3600)
 
-        ret, info = put_file_v2(
-            token,
-            key,
-            local_path,
-            version="v2",
-            bucket_name=self.bucket,
-            regions=self._regions(),
+        proxy_keys = (
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "ALL_PROXY",
+            "http_proxy",
+            "https_proxy",
+            "all_proxy",
         )
+        old_proxy_env = {name: os.environ.get(name) for name in proxy_keys}
+
+        try:
+            for name in proxy_keys:
+                os.environ.pop(name, None)
+
+            ret, info = put_file_v2(
+                token,
+                key,
+                local_path,
+                version="v2",
+                bucket_name=self.bucket,
+                regions=self._regions(),
+            )
+        finally:
+            for name, value in old_proxy_env.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
 
         if info.status_code != 200:
             app_logger.error(

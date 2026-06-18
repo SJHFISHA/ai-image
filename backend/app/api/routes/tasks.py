@@ -2,6 +2,7 @@
 任务查询相关路由
 """
 from typing import Optional, List
+from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -13,7 +14,8 @@ from app.schemas.generation import (
     TaskListResponse
 )
 from app.schemas.common import ApiResponse
-from app.services import generation_service
+from app.services import generation_service, conversation_service
+from app.utils.timezone import now_beijing_naive
 from app.providers.qiniu_provider import qiniu_provider
 
 router = APIRouter(prefix="/tasks", tags=["任务"])
@@ -72,6 +74,22 @@ def get_task_detail(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="无权访问此任务"
         )
+
+    if task.status == "running" and task.started_at:
+        if now_beijing_naive() - task.started_at > timedelta(minutes=5):
+            error_msg = "任务执行超时，请稍后重试"
+            generation_service.settle_task_failed(db, task.task_id, error_msg)
+            task = generation_service.get_task_by_id(db, task_id)
+
+            message = conversation_service.get_message_by_task_id(db, task_id)
+            if message:
+                conversation_service.update_message_status(
+                    db=db,
+                    message_id=message.message_id,
+                    status_val="failed",
+                    content_text=error_msg,
+                    metadata_json={"error": error_msg},
+                )
 
     # 提取图片URL列表
     images = resolve_task_image_urls(task)

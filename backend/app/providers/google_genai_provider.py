@@ -4,6 +4,7 @@ Google GenAI Provider
 """
 import base64
 import json
+import re
 from typing import Dict, Any, Optional
 
 import requests
@@ -176,14 +177,14 @@ class GoogleGenAIProvider(BaseProvider):
         return f"{model}{suffix}"
 
     def edit_image(
-        self,
-        model: str,
-        prompt: str,
-        image_url: str,
-        route_mode: Optional[str] = None,
-        temperature: float = 0.7,
-        max_tokens: int = 4096,
-        **kwargs
+            self,
+            model: str,
+            prompt: str,
+            image_urls: list[str],
+            route_mode: Optional[str] = None,
+            temperature: float = 0.7,
+            max_tokens: int = 4096,
+            **kwargs
     ) -> Dict[str, Any]:
         if not self.api_key:
             raise ValueError("API_GATEWAY_API_KEY is not configured")
@@ -203,7 +204,10 @@ class GoogleGenAIProvider(BaseProvider):
                     "role": "user",
                     "content": [
                         {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": image_url}},
+                        *[
+                            {"type": "image_url", "image_url": {"url": url}}
+                            for url in image_urls[:2]
+                        ],
                     ],
                 }
             ],
@@ -226,12 +230,37 @@ class GoogleGenAIProvider(BaseProvider):
         images = self._extract_images_from_chat_result(result)
 
         if not images:
-            raise RuntimeError(f"Gemini image edit did not return image data: {result}")
+            raise RuntimeError("Gemini image edit did not return recognizable image data")
 
         return {"data": images}
 
     def _extract_images_from_chat_result(self, result: Dict[str, Any]) -> list[dict]:
         images = []
+
+        def add_image_value(value: Any):
+            if not isinstance(value, str) or not value:
+                return
+
+            value = value.strip()
+
+            if value.startswith("http://") or value.startswith("https://"):
+                images.append({"url": value})
+                return
+
+            data_url_match = re.search(
+                r"data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\r\n]+",
+                value,
+            )
+            if data_url_match:
+                images.append({"b64_json": data_url_match.group(0)})
+                return
+
+            raw_base64_match = re.search(
+                r"([A-Za-z0-9+/]{500,}={0,2})",
+                value,
+            )
+            if raw_base64_match:
+                images.append({"b64_json": raw_base64_match.group(1)})
 
         for choice in result.get("choices", []):
             message = choice.get("message", {})
@@ -243,17 +272,14 @@ class GoogleGenAIProvider(BaseProvider):
                         continue
 
                     image_url = part.get("image_url")
-                    if isinstance(image_url, dict) and image_url.get("url"):
-                        images.append({"url": image_url["url"]})
+                    if isinstance(image_url, dict):
+                        add_image_value(image_url.get("url"))
 
-                    if part.get("type") in {"image", "output_image"} and part.get("image"):
-                        images.append({"b64_json": part["image"]})
+                    for key in ("image", "b64_json", "data", "url", "text"):
+                        add_image_value(part.get(key))
 
             elif isinstance(content, str):
-                if content.startswith("data:image/"):
-                    images.append({"b64_json": content})
-                elif content.startswith("http://") or content.startswith("https://"):
-                    images.append({"url": content})
+                add_image_value(content)
 
         return images
 

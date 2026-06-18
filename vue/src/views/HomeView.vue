@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import {
@@ -23,12 +23,23 @@ const router = useRouter()
 const currentSessionId = ref<string | null>(null)
 const historyMessages = ref<ConversationMessage[]>([])
 const inputText = ref('')
-const selectedReferenceFile = ref<File | null>(null)
-const selectedReferencePreview = ref('')
-function revokeReferencePreview() {
-  if (selectedReferencePreview.value) {
-    URL.revokeObjectURL(selectedReferencePreview.value)
-  }
+interface ReferenceImageItem {
+  id: string
+  file: File
+  preview: string
+}
+
+const selectedReferenceImages = ref<ReferenceImageItem[]>([])
+
+function revokeReferencePreviews() {
+  selectedReferenceImages.value.forEach(item => {
+    URL.revokeObjectURL(item.preview)
+  })
+}
+
+function clearReferenceImages() {
+  revokeReferencePreviews()
+  selectedReferenceImages.value = []
 }
 const sending = ref(false)
 const generatedImages = ref<string[]>([])
@@ -71,6 +82,16 @@ watch(() => route.query.session_id, async (sid) => {
     try {
       const detail = await getConversationDetail(currentSessionId.value)
       historyMessages.value = detail.messages || []
+      await nextTick()
+      document.querySelector('.main-content')?.scrollTo({ top: 0 })
+
+      const runningMessage = historyMessages.value.find(
+        msg => msg.content_type === 'image' && msg.status === 'running' && msg.task_id
+      )
+
+      if (runningMessage?.task_id) {
+        startPolling(runningMessage.task_id)
+      }
     } catch {
       // 静默处理
     }
@@ -145,7 +166,7 @@ async function handleSend() {
 
   if (sending.value) return
 
-  if (selectedMode.value === 'edit' && !selectedReferenceFile.value) {
+  if (selectedMode.value === 'edit' && selectedReferenceImages.value.length === 0) {
     message.warning('请先上传需要编辑的图片')
     return
   }
@@ -166,12 +187,15 @@ async function handleSend() {
     let taskRes
 
     if (selectedMode.value === 'edit') {
-      const uploadRes = await uploadReferenceImage(selectedReferenceFile.value as File)
+      const uploadResults = await Promise.all(
+        selectedReferenceImages.value.map(item => uploadReferenceImage(item.file))
+      )
+
       taskRes = await createImageEditTask({
         session_id: currentSessionId.value || undefined,
         price_config_id: selectedPriceConfig.value.id,
         prompt: inputText.value,
-        image_url: uploadRes.url,
+        image_urls: uploadResults.map(item => item.url),
       })
     } else {
       taskRes = await createImageTask({
@@ -191,8 +215,17 @@ async function handleSend() {
     // 如果任务已经完成（同步返回成功或失败）
     if (taskRes.status === 'success') {
       const detail = await getTaskDetail(taskRes.task_id)
-      generatedImages.value = detail.images || []
-      message.success('图片生成成功！')
+
+      if (currentSessionId.value) {
+        const conversation = await getConversationDetail(currentSessionId.value)
+        historyMessages.value = conversation.messages || []
+        generatedImages.value = []
+        currentPrompt.value = ''
+      } else {
+        generatedImages.value = detail.images || []
+      }
+
+      message.success('图片生成成功')
       await userStore.fetchUserInfo()
       window.dispatchEvent(new Event('history-refresh'))
       sending.value = false
@@ -209,9 +242,7 @@ async function handleSend() {
     }
 
     inputText.value = ''
-    selectedReferenceFile.value = null
-    revokeReferencePreview()
-    selectedReferencePreview.value = ''
+    clearReferenceImages()
   } catch (error: unknown) {
     const errorMessage =
       error &&
@@ -230,27 +261,49 @@ async function handleSend() {
 // ======================== 轮询逻辑 ========================
 function startPolling(taskId: string) {
   clearPolling()
+
   pollTimer.value = setInterval(async () => {
     try {
       const detail = await getTaskDetail(taskId)
+
       if (detail.status === 'success') {
-        generatedImages.value = detail.images || []
-        message.success('图片生成成功！')
+        if (currentSessionId.value) {
+          const conversation = await getConversationDetail(currentSessionId.value)
+          historyMessages.value = conversation.messages || []
+          generatedImages.value = []
+          currentPrompt.value = ''
+        } else {
+          generatedImages.value = detail.images || []
+        }
+
+        message.success('图片生成成功')
         await userStore.fetchUserInfo()
         window.dispatchEvent(new Event('history-refresh'))
         clearPolling()
         sending.value = false
-      } else if (detail.status === 'failed') {
+        return
+      }
+
+      if (detail.status === 'failed') {
         generatedImages.value = []
-        message.error(detail.error_message ? `图片生成失败，积分已退回：${detail.error_message}` : '图片生成失败，积分已退回')
+
+        if (currentSessionId.value) {
+          const conversation = await getConversationDetail(currentSessionId.value)
+          historyMessages.value = conversation.messages || []
+        }
+
+        message.error(
+          detail.error_message
+            ? `图片生成失败，积分已退回：${detail.error_message}`
+            : '图片生成失败，积分已退回'
+        )
         await userStore.fetchUserInfo()
         window.dispatchEvent(new Event('history-refresh'))
         clearPolling()
         sending.value = false
       }
-      // running 或 pending 状态继续轮询
-    } catch {
-      // 单次查询失败不终止轮询
+    } catch (error) {
+      console.error('查询任务状态失败:', error)
     }
   }, 2000)
 }
@@ -264,7 +317,7 @@ function clearPolling() {
 
 onUnmounted(() => {
   clearPolling()
-  revokeReferencePreview()
+  revokeReferencePreviews()
 })
 
 function handleKeyDown(e: KeyboardEvent) {
@@ -288,9 +341,7 @@ function handleAgentModeMenu({ key }: { key: string | number }) {
   agentModeOpen.value = false
 
   if (selectedMode.value !== 'edit') {
-    selectedReferenceFile.value = null
-    revokeReferencePreview()
-    selectedReferencePreview.value = ''
+    clearReferenceImages()
   }
 
   loadModelPrices()
@@ -298,32 +349,50 @@ function handleAgentModeMenu({ key }: { key: string | number }) {
 
 function handleReferenceFileChange(event: Event) {
   const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
+  const files = Array.from(input.files || [])
+  if (!files.length) return
 
-  if (!file.type.startsWith('image/')) {
-    message.warning('请选择图片文件')
+  const remainingSlots = 2 - selectedReferenceImages.value.length
+  if (remainingSlots <= 0) {
+    message.warning('最多只能上传 2 张参考图')
     return
   }
 
-  if (file.size > 10 * 1024 * 1024) {
-    message.warning('图片不能超过 10MB')
-    return
+  const validFiles = files.slice(0, remainingSlots)
+
+  for (const file of validFiles) {
+    if (!file.type.startsWith('image/')) {
+      message.warning('请选择图片文件')
+      continue
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      message.warning('图片不能超过 10MB')
+      continue
+    }
+
+    selectedReferenceImages.value.push({
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      file,
+      preview: URL.createObjectURL(file),
+    })
   }
 
-  revokeReferencePreview()
-  selectedReferenceFile.value = file
-  selectedReferencePreview.value = URL.createObjectURL(file)
-  selectedMode.value = 'edit'
-  loadModelPrices()
+  if (selectedReferenceImages.value.length > 0) {
+    selectedMode.value = 'edit'
+    loadModelPrices()
+  }
 }
 
-function removeReferenceImage() {
-  selectedReferenceFile.value = null
-  revokeReferencePreview()
-  selectedReferencePreview.value = ''
+function removeReferenceImage(id: string) {
+  const target = selectedReferenceImages.value.find(item => item.id === id)
+  if (target) {
+    URL.revokeObjectURL(target.preview)
+  }
 
-  if (selectedMode.value === 'edit') {
+  selectedReferenceImages.value = selectedReferenceImages.value.filter(item => item.id !== id)
+
+  if (selectedReferenceImages.value.length === 0 && selectedMode.value === 'edit') {
     selectedMode.value = 'image'
     loadModelPrices()
   }
@@ -440,8 +509,16 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="chat-page" :class="{ 'has-chat': currentPrompt || generatedImages.length || sending }">
-    <h1 v-if="!currentPrompt && !generatedImages.length && !sending" class="main-greeting">
+  <div
+    :class="[
+    'chat-page',
+    { 'has-chat': currentPrompt || generatedImages.length || sending || historyMessages.length }
+  ]"
+  >
+    <h1
+      v-if="!currentPrompt && !generatedImages.length && !sending && !historyMessages.length"
+      class="main-greeting"
+    >
       你好，想创作什么？
     </h1>
 
@@ -451,13 +528,14 @@ onMounted(() => {
         <div v-if="msg.role === 'user'" class="user-row">
           <div class="user-bubble-wrap">
             <button
-              v-if="msg.metadata_json?.reference_image_url"
+              v-for="url in (msg.metadata_json?.reference_image_urls || (msg.metadata_json?.reference_image_url ? [msg.metadata_json.reference_image_url] : []))"
+              :key="url"
               class="reference-history-btn"
               type="button"
-              @click="openImagePreview(msg.metadata_json.reference_image_url)"
+              @click="openImagePreview(url)"
             >
               <img
-                :src="msg.metadata_json.reference_image_url"
+                :src="url"
                 class="reference-history-image"
                 alt="参考图"
               />
@@ -513,6 +591,14 @@ onMounted(() => {
           </div>
           <div v-else-if="msg.content_type === 'image' && msg.status === 'running'" class="generation-card">
             <div class="generation-title">正在生成图片...</div>
+            <div class="dot-field">
+              <span
+                v-for="dot in loadingDots"
+                :key="dot.id"
+                class="loading-dot"
+                :style="{ animationDelay: dot.delay, opacity: dot.opacity }"
+              ></span>
+            </div>
           </div>
           <div v-else-if="msg.content_type === 'image' && msg.status === 'failed'" class="generation-card" style="color: #ff4d4f;">
             <div class="generation-title">图片生成失败</div>
@@ -563,7 +649,10 @@ onMounted(() => {
         </div>
       </div>
 
-      <div v-if="sending" class="assistant-row">
+      <div
+        v-if="sending && !historyMessages.some(msg => msg.content_type === 'image' && msg.status === 'running')"
+        class="assistant-row"
+      >
         <div class="generation-card">
           <div class="generation-title">正在创建图片</div>
           <div class="dot-field">
@@ -610,21 +699,50 @@ onMounted(() => {
     </div>
     <div class="input-card">
       <div class="input-area">
-        <label class="upload-btn">
-          <PlusOutlined />
-          <input class="upload-input" type="file" accept="image/*" @change="handleReferenceFileChange" @click="($event.target as HTMLInputElement).value = ''" />
-        </label>
+        <div
+          class="reference-stack"
+          :class="{ expanded: selectedReferenceImages.length > 0 }"
+        >
+          <div
+            v-for="(item, index) in selectedReferenceImages"
+            :key="item.id"
+            class="reference-card"
+            :style="{ '--i': index }"
+          >
+            <img :src="item.preview" alt="参考图" />
+            <button
+              type="button"
+              class="reference-remove"
+              @click.stop="removeReferenceImage(item.id)"
+            >
+              ×
+            </button>
+          </div>
+
+          <label
+            v-if="selectedReferenceImages.length < 2"
+            class="reference-add-card"
+            :style="{ '--i': selectedReferenceImages.length }"
+          >
+            <PlusOutlined />
+            <input
+              class="upload-input"
+              type="file"
+              accept="image/*"
+              multiple
+              @change="handleReferenceFileChange"
+              @click="($event.target as HTMLInputElement).value = ''"
+            />
+          </label>
+        </div>
+
         <textarea
           v-model="inputText"
           class="input-text"
-          placeholder="输入想法、剧本或上传参考，支持 / 使用技能，@ 添加主体，和Agent一起创作"
+          placeholder="输入想法、脚本， “/” 使用技能， @ 添加主体，和Agent一起创作"
           rows="2"
           @keydown="handleKeyDown"
         ></textarea>
-        <div v-if="selectedReferencePreview" class="reference-preview">
-          <img :src="selectedReferencePreview" alt="参考图" />
-          <button type="button" class="reference-remove" @click="removeReferenceImage">×</button>
-        </div>
       </div>
 
       <div class="toolbar">
@@ -726,7 +844,7 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100%;
+  min-height: 100vh;
   padding: 72px 24px 32px;
   width: 100%;
   box-sizing: border-box;
@@ -736,8 +854,9 @@ onMounted(() => {
 
 .chat-page.has-chat {
   justify-content: flex-start;
-  min-height: auto;
-  padding-bottom: 24px;
+  min-height: 100vh;
+  padding-top: 32px;
+  padding-bottom: 300px;
 }
 
 .main-greeting {
@@ -767,12 +886,14 @@ onMounted(() => {
   z-index: 1;
 }
 .chat-page.has-chat .input-card {
-  position: sticky;
+  position: fixed;
+  left: calc(50% + 160px);
   bottom: 24px;
-  width: 100%;
+  transform: translateX(-50%);
+  width: min(800px, calc(100vw - 360px));
   max-width: 800px;
   z-index: 100;
-  margin-top: 24px;
+  margin-top: 0;
 }
 
 [data-theme='dark'] .input-card {
@@ -788,57 +909,7 @@ onMounted(() => {
   width: 100%;
 }
 
-.upload-btn {
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  border-radius: 6px;
-  background: #f5f5f5;
-  border: 1px dashed #d9d9d9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.2s;
-  color: #999;
-  font-size: 16px;
-}
 
-.upload-input {
-  display: none;
-}
-
-.reference-preview {
-  position: relative;
-  width: 72px;
-  height: 72px;
-  border-radius: 8px;
-  overflow: hidden;
-  flex-shrink: 0;
-  background: #f5f5f5;
-}
-
-.reference-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.reference-remove {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 18px;
-  height: 18px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  cursor: pointer;
-  line-height: 18px;
-  padding: 0;
-}
 
 .reference-history-btn {
   width: 96px;
@@ -858,15 +929,113 @@ onMounted(() => {
   object-fit: cover;
 }
 
-.upload-btn:hover {
-  border-color: #1677ff;
-  color: #1677ff;
+.upload-input {
+  display: none;
 }
 
-[data-theme='dark'] .upload-btn {
+.reference-stack {
+  position: relative;
+  width: 72px;
+  height: 86px;
+  flex: 0 0 72px;
+  margin-right: 8px;
+}
+
+.reference-card,
+.reference-add-card {
+  --i: 0;
+  position: absolute;
+  left: calc(var(--i) * 9px);
+  top: calc(var(--i) * 4px);
+  width: 58px;
+  height: 78px;
+  border-radius: 4px;
+  transform: rotate(calc(-8deg + var(--i) * 10deg));
+  transform-origin: center bottom;
+  transition:
+    transform 0.2s ease,
+    left 0.2s ease,
+    top 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.reference-card {
+  z-index: calc(2 + var(--i));
+  overflow: visible;
+  background: #f5f5f5;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+}
+
+.reference-card img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.reference-add-card {
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #8a96a3;
+  font-size: 20px;
+  background: #f5f6f8;
+  border: 1px solid #e5e8ef;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+}
+
+.reference-stack.expanded:hover {
+  width: 152px;
+  flex-basis: 152px;
+}
+
+.reference-stack.expanded:hover .reference-card,
+.reference-stack.expanded:hover .reference-add-card {
+  left: calc(var(--i) * 62px);
+  top: 0;
+  transform: rotate(calc(-5deg + var(--i) * 5deg));
+}
+
+.reference-stack.expanded:hover .reference-card:hover {
+  z-index: 10;
+  transform: translateY(-4px) rotate(0deg) scale(1.04);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+}
+
+.reference-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(28, 34, 42, 0.92);
+  color: #fff;
+  cursor: pointer;
+  line-height: 18px;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.reference-card:hover .reference-remove {
+  opacity: 1;
+}
+
+.reference-add-card:hover {
+  color: #1677ff;
+  border-color: #b8d8ff;
+  background: #f8fbff;
+}
+
+[data-theme='dark'] .reference-card,
+[data-theme='dark'] .reference-add-card {
   background: #2a2a2a;
   border-color: #424242;
-  color: #666;
 }
 
 .input-text {
@@ -1015,11 +1184,14 @@ onMounted(() => {
 .chat-thread {
   width: 100%;
   max-width: 800px;
-  margin-top: 20px;
-  margin-bottom: 24px;
+  margin-top: 0;
+  margin-bottom: 0;
   display: flex;
   flex-direction: column;
   gap: 18px;
+  padding-top: 8px;
+  padding-bottom: 280px;
+  box-sizing: border-box;
 }
 
 .user-row {

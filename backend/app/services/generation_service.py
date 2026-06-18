@@ -101,11 +101,11 @@ def create_image_task(
         raise
 
 def create_image_edit_task(
-    db: Session,
-    user_id: int,
-    price_config_id: int,
-    prompt: str,
-    image_url: str,
+        db: Session,
+        user_id: int,
+        price_config_id: int,
+        prompt: str,
+        image_urls: list[str],
 ) -> GenerationTask:
     price_config = model_price_service.validate_model_price_config(
         db, price_config_id, capability_type="image_edit"
@@ -147,7 +147,7 @@ def create_image_edit_task(
                 "provider": model_config.provider_key,
                 "route_mode": model_config.route_mode,
                 "prompt": prompt,
-                "image_url": image_url,
+                "image_urls": image_urls,
                 "size": price_config.image_size,
                 "count": price_config.image_count,
                 "aspect_ratio": price_config.aspect_ratio,
@@ -359,7 +359,7 @@ def execute_image_edit(
         db: Session,
         task: GenerationTask,
         prompt: str,
-        image_url: str,
+        image_urls: list[str],
         session_id: Optional[str] = None,
         assistant_message_id: Optional[str] = None,
 ) -> tuple[bool, Optional[str], Optional[dict]]:
@@ -398,7 +398,7 @@ def execute_image_edit(
         api_result = provider.edit_image(
             model=task.model_key,
             prompt=prompt,
-            image_url=image_url,
+            image_urls=image_urls,
             route_mode=task.route_mode,
         )
 
@@ -512,11 +512,11 @@ def execute_image_edit(
         return False, error_msg, None
 
 def execute_image_edit_by_task_id(
-    task_id: str,
-    prompt: str,
-    image_url: str,
-    session_id: Optional[str] = None,
-    assistant_message_id: Optional[str] = None,
+        task_id: str,
+        prompt: str,
+        image_urls: list[str],
+        session_id: Optional[str] = None,
+        assistant_message_id: Optional[str] = None,
 ):
     from app.db.database import SessionLocal
 
@@ -528,7 +528,7 @@ def execute_image_edit_by_task_id(
                 db=db,
                 task=task,
                 prompt=prompt,
-                image_url=image_url,
+                image_urls=image_urls,
                 session_id=session_id,
                 assistant_message_id=assistant_message_id,
             )
@@ -682,10 +682,12 @@ def settle_task_failed(
         )
 
         # 更新任务状态
+        safe_error_message = error_message[:1000] if error_message else ""
+
         task.status = "failed"
         task.refunded_points = task.frozen_points
-        task.error_message = error_message
-        task.provider_response_json = {"error": error_message}
+        task.error_message = safe_error_message
+        task.provider_response_json = {"error": safe_error_message}
         task.finished_at = now_beijing_naive()
 
         db.commit()

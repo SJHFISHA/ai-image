@@ -96,7 +96,9 @@ const isAuthPage = computed(() => {
 
 const { Sider, Content } = Layout
 
-const isDark = ref(false)
+const THEME_STORAGE_KEY = 'app_theme'
+
+const isDark = ref(localStorage.getItem(THEME_STORAGE_KEY) === 'dark')
 const collapsed = ref(false)
 const selectedKeys = ref<string[]>(['new-chat'])
 const primaryNavItems = [
@@ -154,8 +156,11 @@ function handleAvatarChange(event: Event) {
 
 function toggleTheme() {
   isDark.value = !isDark.value
+  localStorage.setItem(THEME_STORAGE_KEY, isDark.value ? 'dark' : 'light')
 }
-
+watch(isDark, (value) => {
+  document.documentElement.setAttribute('data-theme', value ? 'dark' : 'light')
+}, { immediate: true })
 // 退出登录
 function handleLogout() {
   userStore.logout()
@@ -416,6 +421,17 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
   justify-content: center;
   margin-bottom: 140px;
   overflow: hidden;
+}
+
+.main-content {
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #fff;
+}
+
+[data-theme='dark'] .main-content {
+  background: #141414;
 }
 
 .brand-logo {

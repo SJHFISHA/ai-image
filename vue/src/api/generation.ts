@@ -27,7 +27,7 @@ export interface CreateImageEditTaskParams {
   session_id?: string
   price_config_id: number
   prompt: string
-  image_url: string
+  image_urls: string[]
 }
 
 export interface UploadReferenceImageResult {

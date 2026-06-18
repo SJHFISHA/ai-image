@@ -258,7 +258,7 @@ def create_image_edit_task(
         role="user",
         content_type="mixed",
         content_text=request.prompt,
-        metadata_json={"reference_image_url": request.image_url},
+        metadata_json={"reference_image_urls": request.image_urls},
     )
 
     try:
@@ -267,7 +267,7 @@ def create_image_edit_task(
             user_id=current_user.id,
             price_config_id=request.price_config_id,
             prompt=request.prompt,
-            image_url=request.image_url,
+            image_urls=request.image_urls,
         )
     except Exception:
         try:
@@ -300,7 +300,7 @@ def create_image_edit_task(
         generation_service.execute_image_edit_by_task_id,
         task.task_id,
         request.prompt,
-        request.image_url,
+        request.image_urls,
         session_id=conversation.session_id,
         assistant_message_id=assistant_message.message_id,
     )
