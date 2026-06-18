@@ -27,6 +27,10 @@
           <template #icon><SettingOutlined /></template>
           <span>模型价格配置</span>
         </a-menu-item>
+        <a-menu-item key="/admin/notifications">
+          <template #icon><BellOutlined /></template>
+          <span>通知管理</span>
+        </a-menu-item>
         <a-menu-item key="/admin/recharge-packages">
           <template #icon><GiftOutlined /></template>
           <span>充值套餐</span>
@@ -118,6 +122,7 @@ import {
   BulbFilled,
   TeamOutlined,
   ThunderboltOutlined,
+  BellOutlined,
 } from '@ant-design/icons-vue'
 
 const route = useRoute()

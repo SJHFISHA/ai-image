@@ -3,7 +3,7 @@
 """
 from fastapi import APIRouter
 
-from app.api.routes import auth, points, model_prices, image, tasks, admin, assets, conversations
+from app.api.routes import auth, points, model_prices, image, tasks, admin, assets, conversations, notifications
 
 # 创建总路由
 api_router = APIRouter(prefix="/api")
@@ -17,6 +17,7 @@ api_router.include_router(tasks.router)
 api_router.include_router(assets.router)
 api_router.include_router(admin.router)
 api_router.include_router(conversations.router)
+api_router.include_router(notifications.router)
 
 # TODO: 第八阶段添加充值路由
 # from app.api.routes import recharge

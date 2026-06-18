@@ -359,3 +359,33 @@ CREATE TABLE media_assets (
     INDEX idx_task_id (task_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='媒体资源表';
 
+
+-- ======================== 系统通知表 ========================
+CREATE TABLE IF NOT EXISTS system_notifications (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '通知ID',
+    notification_id VARCHAR(64) NOT NULL UNIQUE COMMENT '通知业务ID',
+    title VARCHAR(128) NOT NULL COMMENT '通知标题',
+    content TEXT NOT NULL COMMENT '通知内容',
+    type VARCHAR(32) NOT NULL DEFAULT 'system' COMMENT '通知类型: system, maintenance, activity, update',
+    level VARCHAR(32) NOT NULL DEFAULT 'info' COMMENT '通知等级: info, success, warning, error',
+    status VARCHAR(32) NOT NULL DEFAULT 'draft' COMMENT '状态: draft, published, disabled',
+    target_type VARCHAR(32) NOT NULL DEFAULT 'all' COMMENT '目标类型: all',
+    publish_at DATETIME NULL COMMENT '发布时间',
+    expire_at DATETIME NULL COMMENT '过期时间',
+    created_by BIGINT NULL COMMENT '创建管理员ID',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    INDEX idx_notification_status_time (status, publish_at, expire_at),
+    INDEX idx_notification_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统通知表';
+
+-- ======================== 用户通知已读表 ========================
+CREATE TABLE IF NOT EXISTS user_notification_reads (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '记录ID',
+    user_id BIGINT NOT NULL COMMENT '用户ID',
+    notification_id VARCHAR(64) NOT NULL COMMENT '通知业务ID',
+    read_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '已读时间',
+    UNIQUE KEY uk_user_notification_read (user_id, notification_id),
+    INDEX idx_user_read (user_id, read_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户通知已读表';
+

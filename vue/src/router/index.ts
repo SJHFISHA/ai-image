@@ -64,6 +64,11 @@ const router = createRouter({
           redirect: '/admin/model-prices'
         },
         {
+          path: 'notifications',
+          name: 'admin-notifications',
+          component: () => import('@/views/admin/NotificationView.vue')
+        },
+        {
           path: 'model-configs',
           name: 'admin-model-configs',
           component: () => import('@/views/admin/ModelConfigView.vue')

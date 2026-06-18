@@ -23,6 +23,38 @@ export interface AdminLoginResult {
   admin: AdminInfo
 }
 
+export interface AdminNotification {
+  id: number
+  notification_id: string
+  title: string
+  content: string
+  type: string
+  level: string
+  status: string
+  target_type: string
+  publish_at?: string
+  expire_at?: string
+  created_by?: number
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminNotificationCreateParams {
+  title: string
+  content: string
+  type?: string
+  level?: string
+  status?: string
+  target_type?: string
+  publish_at?: string
+  expire_at?: string
+}
+
+export interface AdminNotificationListResult {
+  total: number
+  items: AdminNotification[]
+}
+
 // 模型配置
 export interface ModelConfig {
   id: number
@@ -204,6 +236,35 @@ export function adminLogin(data: AdminLoginParams) {
 
 export function getAdminInfo() {
   return httpGet<AdminInfo>('/admin/auth/me')
+}
+
+export function getAdminNotificationList(params?: {
+  keyword?: string
+  status_filter?: string
+  page?: number
+  page_size?: number
+}) {
+  return httpGet<AdminNotificationListResult>('/admin/notifications', { params })
+}
+
+export function createAdminNotification(data: AdminNotificationCreateParams) {
+  return httpPost<AdminNotification>('/admin/notifications', data)
+}
+
+export function updateAdminNotification(id: number, data: Partial<AdminNotificationCreateParams>) {
+  return httpPut<AdminNotification>(`/admin/notifications/${id}`, data)
+}
+
+export function deleteAdminNotification(id: number) {
+  return httpDelete(`/admin/notifications/${id}`)
+}
+
+export function publishAdminNotification(id: number) {
+  return httpPost<AdminNotification>(`/admin/notifications/${id}/publish`)
+}
+
+export function disableAdminNotification(id: number) {
+  return httpPost<AdminNotification>(`/admin/notifications/${id}/disable`)
 }
 
 // 模型配置

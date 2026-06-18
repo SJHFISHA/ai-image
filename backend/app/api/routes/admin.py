@@ -40,6 +40,13 @@ from app.schemas.admin import (
     AdminTaskDetailResponse,
     AdminTaskListResponse,
 )
+from app.schemas.notification import (
+    AdminNotificationCreateRequest,
+    AdminNotificationUpdateRequest,
+    NotificationDetailResponse,
+    NotificationListResponse,
+)
+from app.services import notification_service
 from app.services import admin_service
 
 router = APIRouter(prefix="/admin", tags=["后台管理"])
@@ -86,6 +93,85 @@ def get_admin_me(current_admin: AdminUser = Depends(get_current_admin_user)):
         success=True
     )
 
+# ======================== 通知管理 CRUD ========================
+
+@router.get("/notifications", response_model=ApiResponse[NotificationListResponse], summary="查询通知列表")
+def get_admin_notifications(
+    keyword: Optional[str] = Query(None, description="搜索标题/内容"),
+    status_filter: Optional[str] = Query(None, description="状态筛选"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    current_admin: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    result = notification_service.get_admin_notification_list(
+        db=db,
+        keyword=keyword,
+        status_filter=status_filter,
+        page=page,
+        page_size=page_size
+    )
+    items = [NotificationDetailResponse.model_validate(item) for item in result["items"]]
+    return ApiResponse(data=NotificationListResponse(total=result["total"], items=items))
+
+
+@router.post("/notifications", response_model=ApiResponse[NotificationDetailResponse], summary="创建通知")
+def create_admin_notification(
+    request: AdminNotificationCreateRequest,
+    current_admin: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    notification = notification_service.create_admin_notification(
+        db=db,
+        data=request.model_dump(),
+        admin_id=current_admin.id
+    )
+    return ApiResponse(code=0, message="创建成功", data=NotificationDetailResponse.model_validate(notification))
+
+
+@router.put("/notifications/{notification_id}", response_model=ApiResponse[NotificationDetailResponse], summary="更新通知")
+def update_admin_notification(
+    notification_id: int,
+    request: AdminNotificationUpdateRequest,
+    current_admin: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    notification = notification_service.update_admin_notification(
+        db=db,
+        notification_id=notification_id,
+        data=request.model_dump(exclude_unset=True)
+    )
+    return ApiResponse(code=0, message="更新成功", data=NotificationDetailResponse.model_validate(notification))
+
+
+@router.delete("/notifications/{notification_id}", response_model=ApiResponse, summary="删除通知")
+def delete_admin_notification(
+    notification_id: int,
+    current_admin: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    notification_service.delete_admin_notification(db=db, notification_id=notification_id)
+    return ApiResponse(code=0, message="删除成功")
+
+
+@router.post("/notifications/{notification_id}/publish", response_model=ApiResponse[NotificationDetailResponse], summary="发布通知")
+def publish_admin_notification(
+    notification_id: int,
+    current_admin: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    notification = notification_service.publish_admin_notification(db=db, notification_id=notification_id)
+    return ApiResponse(code=0, message="发布成功", data=NotificationDetailResponse.model_validate(notification))
+
+
+@router.post("/notifications/{notification_id}/disable", response_model=ApiResponse[NotificationDetailResponse], summary="下架通知")
+def disable_admin_notification(
+    notification_id: int,
+    current_admin: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    notification = notification_service.disable_admin_notification(db=db, notification_id=notification_id)
+    return ApiResponse(code=0, message="下架成功", data=NotificationDetailResponse.model_validate(notification))
 
 # ======================== 模型配置 CRUD ========================
 

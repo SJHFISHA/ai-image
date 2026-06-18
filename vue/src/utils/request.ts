@@ -63,13 +63,18 @@ request.interceptors.response.use(
         case 401:
           // token 过期或无效，根据路径判断跳转到用户还是管理员登录页
           const reqUrl = error?.config?.url || ''
-          if (reqUrl.startsWith('/admin/')) {
+
+          if (reqUrl === '/admin/auth/login') {
+            message.error(errorMessage || '用户名或密码错误')
+          } else if (reqUrl.startsWith('/admin/')) {
             localStorage.removeItem('admin_access_token')
-            message.error('管理员登录已过期，请重新登录')
+            message.error(errorMessage || '管理员登录已过期，请重新登录')
             router.push('/admin/login')
+          } else if (reqUrl === '/auth/login' || reqUrl === '/auth/register') {
+            message.error(errorMessage || '用户名或密码错误')
           } else {
             localStorage.removeItem('access_token')
-            message.error('登录已过期，请重新登录')
+            message.error(errorMessage || '登录已过期，请重新登录')
             router.push('/login')
           }
           break
@@ -100,19 +105,27 @@ request.interceptors.response.use(
  * 类型安全的请求封装
  * 拦截器已经解包了 ApiResponse，所以返回值直接是 T
  */
-export function httpGet<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
+export function httpGet<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T> {
   return request.get(url, config) as unknown as Promise<T>
 }
 
-export function httpPost<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+export function httpPost<T = unknown>(
+  url: string,
+  data?: unknown,
+  config?: AxiosRequestConfig
+): Promise<T> {
   return request.post(url, data, config) as unknown as Promise<T>
 }
 
-export function httpPut<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+export function httpPut<T = unknown>(
+  url: string,
+  data?: unknown,
+  config?: AxiosRequestConfig
+): Promise<T> {
   return request.put(url, data, config) as unknown as Promise<T>
 }
 
-export function httpDelete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
+export function httpDelete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T> {
   return request.delete(url, config) as unknown as Promise<T>
 }
 

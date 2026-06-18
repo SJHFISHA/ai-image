@@ -6,6 +6,13 @@ import { useUserStore } from '@/stores/user'
 import { getConversationList, deleteConversation } from '@/api/conversation'
 import type { ConversationItem } from '@/api/conversation'
 import {
+  getNotificationList,
+  getNotificationUnreadCount,
+  markNotificationRead,
+  markAllNotificationsRead,
+} from '@/api/notification'
+import type { NotificationItem } from '@/api/notification'
+import {
   EditOutlined,
   MessageOutlined,
   MenuFoldOutlined,
@@ -32,6 +39,63 @@ const userStore = useUserStore()
 // 历史会话列表
 const historySessions = ref<ConversationItem[]>([])
 const historyLoading = ref(false)
+const notifications = ref<NotificationItem[]>([])
+const notificationUnreadCount = ref(0)
+const notificationLoading = ref(false)
+let notificationTimer: number | null = null
+
+function formatNotificationTime(val?: string) {
+  if (!val) return ''
+  return val.replace('T', ' ').replace(/\.\d+Z?$/, '')
+}
+
+async function loadNotifications() {
+  if (!userStore.isLoggedIn) {
+    notifications.value = []
+    notificationUnreadCount.value = 0
+    return
+  }
+
+  notificationLoading.value = true
+  try {
+    const [listRes, countRes] = await Promise.all([
+      getNotificationList({ page: 1, page_size: 10 }),
+      getNotificationUnreadCount(),
+    ])
+    notifications.value = listRes.items || []
+    notificationUnreadCount.value = countRes.unread_count || 0
+  } catch {
+    notifications.value = []
+    notificationUnreadCount.value = 0
+  } finally {
+    notificationLoading.value = false
+  }
+}
+
+function startNotificationPolling() {
+  stopNotificationPolling()
+  loadNotifications()
+  notificationTimer = window.setInterval(loadNotifications, 30000)
+}
+
+function stopNotificationPolling() {
+  if (notificationTimer) {
+    window.clearInterval(notificationTimer)
+    notificationTimer = null
+  }
+}
+
+async function handleNotificationClick(item: NotificationItem) {
+  if (!item.is_read) {
+    await markNotificationRead(item.notification_id)
+    await loadNotifications()
+  }
+}
+
+async function handleReadAllNotifications() {
+  await markAllNotificationsRead()
+  await loadNotifications()
+}
 
 async function loadHistory() {
   if (!userStore.isLoggedIn) {
@@ -171,6 +235,7 @@ onMounted(async () => {
   if (userStore.isLoggedIn) {
     await userStore.init()
     await loadHistory()
+    startNotificationPolling()
   }
   // 监听生图完成事件，刷新历史列表
   window.addEventListener('history-refresh', loadHistory)
@@ -178,14 +243,19 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('history-refresh', loadHistory)
+    stopNotificationPolling()
 })
 
 // 登录状态变化时重新加载历史
 watch(() => userStore.isLoggedIn, (loggedIn) => {
   if (loggedIn) {
     loadHistory()
+    startNotificationPolling()
   } else {
     historySessions.value = []
+    notifications.value = []
+    notificationUnreadCount.value = 0
+    stopNotificationPolling()
   }
 })
 </script>
@@ -285,9 +355,54 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
                     </button>
                   </template>
 
-                  <button class="primary-bell-btn" type="button" title="通知">
-                    <BellOutlined class="primary-bell-icon" />
-                  </button>
+                  <a-popover trigger="click" placement="rightBottom">
+                    <button class="primary-bell-btn" type="button" title="通知" @click="loadNotifications">
+                      <a-badge :count="notificationUnreadCount" :offset="[2, -2]" size="small">
+                        <BellOutlined class="primary-bell-icon" />
+                      </a-badge>
+                    </button>
+
+                    <template #content>
+                      <div class="notification-popover">
+                        <div class="notification-header">
+                          <span>通知</span>
+                          <button
+                            v-if="notificationUnreadCount > 0"
+                            class="notification-read-all"
+                            type="button"
+                            @click="handleReadAllNotifications"
+                          >
+                            全部已读
+                          </button>
+                        </div>
+
+                        <div v-if="notificationLoading" class="notification-empty">加载中...</div>
+                        <div v-else-if="notifications.length === 0" class="notification-empty">
+                          暂无通知
+                        </div>
+
+                        <template v-else>
+                          <button
+                            v-for="item in notifications"
+                            :key="item.notification_id"
+                            class="notification-item"
+                            :class="{ unread: !item.is_read }"
+                            type="button"
+                            @click="handleNotificationClick(item)"
+                          >
+                            <div class="notification-title-row">
+                              <span class="notification-title">{{ item.title }}</span>
+                              <span v-if="!item.is_read" class="notification-dot"></span>
+                            </div>
+                            <div class="notification-content">{{ item.content }}</div>
+                            <div class="notification-time">
+                              {{ formatNotificationTime(item.publish_at || item.created_at) }}
+                            </div>
+                          </button>
+                        </template>
+                      </div>
+                    </template>
+                  </a-popover>
                 </div>
               </aside>
 
@@ -546,9 +661,17 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
   line-height: 1;
 }
 
+.primary-bell-btn .ant-badge {
+  color: currentColor;
+}
+
+.primary-bell-btn .ant-badge .anticon {
+  color: currentColor;
+}
+
 [data-theme='dark'] .primary-bell-btn {
   background: transparent;
-  color: rgba(255, 255, 255, 0.72);
+  color: #fff;
 }
 
 [data-theme='dark'] .primary-bell-btn:hover {
@@ -804,5 +927,83 @@ watch(() => userStore.isLoggedIn, (loggedIn) => {
   color: rgba(0, 0, 0, 0.88);
 }
 
+.notification-popover {
+  width: 320px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.notification-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.notification-read-all {
+  border: none;
+  background: transparent;
+  color: #1677ff;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.notification-empty {
+  padding: 24px 0;
+  color: #999;
+  text-align: center;
+}
+
+.notification-item {
+  width: 100%;
+  padding: 10px 8px;
+  border: none;
+  border-bottom: 1px solid #f0f0f0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notification-item:hover {
+  background: #f5f7fb;
+}
+
+.notification-item.unread {
+  background: #f0f7ff;
+}
+
+.notification-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.notification-title {
+  flex: 1;
+  color: #222;
+  font-weight: 600;
+}
+
+.notification-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff4d4f;
+}
+
+.notification-content {
+  margin-top: 4px;
+  color: #555;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.notification-time {
+  margin-top: 6px;
+  color: #999;
+  font-size: 12px;
+}
 
 </style>
