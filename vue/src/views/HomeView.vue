@@ -461,7 +461,7 @@ const availableCounts = computed(() => {
     .filter(item =>
       item.model_key === selectedModel.value &&
       item.image_size === selectedResolution.value &&
-      item.aspect_ratio === selectedAspectRatio.value
+      (item.aspect_ratio || '') === selectedAspectRatio.value
     )
     .map(item => item.image_count)
     .filter((c): c is number => !!c)
@@ -480,7 +480,7 @@ const selectedPriceConfig = computed(() =>
   priceConfigs.value.find(item =>
     item.model_key === selectedModel.value &&
     item.image_size === selectedResolution.value &&
-    item.aspect_ratio === selectedAspectRatio.value &&
+    (item.aspect_ratio || '') === selectedAspectRatio.value &&
     Number(item.image_count) === Number(selectedCount.value)
   )
 )
