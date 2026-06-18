@@ -391,15 +391,14 @@ def execute_image_edit(
         # 根据provider_key获取对应的provider
         provider = get_image_provider(task.provider_key or "api_gateway")
 
-        # 调用对应的provider生成图片
-        if not hasattr(provider, "edit_image"):
-            raise Exception(f"当前供应商不支持图片编辑: {task.provider_key}")
 
         api_result = provider.edit_image(
             model=task.model_key,
             prompt=prompt,
             image_urls=image_urls,
             route_mode=task.route_mode,
+            size=task.image_size or "1024x1024",
+            count=task.image_count or 1,
         )
 
         # 解析返回结果，提取图片 URL 或 base64

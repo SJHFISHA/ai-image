@@ -98,20 +98,20 @@
           />
         </a-form-item>
         <a-form-item label="图片尺寸">
-          <a-select v-model:value="formData.image_size" allow-clear placeholder="请选择分辨率">
-            <a-select-option value="1K">1K</a-select-option>
-            <a-select-option value="2K">2K</a-select-option>
-            <a-select-option value="4K">4K</a-select-option>
-          </a-select>
+          <a-auto-complete
+            v-model:value="formData.image_size"
+            :options="imageSizeOptions"
+            allow-clear
+            placeholder="请选择或输入图片尺寸，如 1024x1024"
+          />
         </a-form-item>
         <a-form-item label="宽高比">
-          <a-select v-model:value="formData.aspect_ratio" allow-clear placeholder="请选择宽高比">
-            <a-select-option value="1:1">1:1 (正方形)</a-select-option>
-            <a-select-option value="16:9">16:9 (横屏)</a-select-option>
-            <a-select-option value="9:16">9:16 (竖屏)</a-select-option>
-            <a-select-option value="4:3">4:3 (传统比例)</a-select-option>
-            <a-select-option value="3:4">3:4 (竖屏比例)</a-select-option>
-          </a-select>
+          <a-auto-complete
+            v-model:value="formData.aspect_ratio"
+            :options="aspectRatioOptions"
+            allow-clear
+            placeholder="请选择或输入宽高比，如 1:1"
+          />
         </a-form-item>
         <a-form-item label="图片数量">
           <a-input-number v-model:value="formData.image_count" :min="1" style="width: 100%" />
@@ -182,6 +182,23 @@ const formData = reactive({
   enabled: 1,
   remark: '',
 })
+
+const imageSizeOptions = [
+  { value: '1024x1024' },
+  { value: '1536x1024' },
+  { value: '1024x1536' },
+  { value: '1K' },
+  { value: '2K' },
+  { value: '4K' },
+]
+
+const aspectRatioOptions = [
+  { value: '1:1' },
+  { value: '16:9' },
+  { value: '9:16' },
+  { value: '4:3' },
+  { value: '3:4' },
+]
 
 const modelOptions = computed(() =>
   modelList.value.map(m => ({

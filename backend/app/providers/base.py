@@ -31,6 +31,21 @@ class BaseProvider(ABC):
         """
         pass
 
+    def edit_image(
+        self,
+        model: str,
+        prompt: str,
+        image_urls: List[str],
+        route_mode: Optional[str] = None,
+        size: str = "1024x1024",
+        count: int = 1,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        编辑图片。默认不支持，由具体 provider 实现。
+        """
+        raise NotImplementedError("当前 provider 不支持图片编辑")
+
     @abstractmethod
     def generate_video(
         self,

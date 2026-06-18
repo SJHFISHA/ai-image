@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS model_configs (
     model_name VARCHAR(128) NOT NULL COMMENT '前端展示名称，例如 GPT Image 2、香蕉模型',
 
     provider_key VARCHAR(64) NOT NULL COMMENT '供应商标识，例如 api_gateway、google_genai',
+    route_mode VARCHAR(32) DEFAULT NULL COMMENT '路由模式: price, speed, success_rate',
     capability_type VARCHAR(32) NOT NULL COMMENT '能力类型: image, video, text, audio',
 
     enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用: 1=启用, 0=禁用',
@@ -155,7 +156,7 @@ CREATE TABLE IF NOT EXISTS model_configs (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
 
-    UNIQUE KEY uk_model_provider (model_key, provider_key),
+     UNIQUE KEY uk_model_provider_capability (model_key, provider_key, capability_type),
     INDEX idx_capability_enabled (capability_type, enabled),
     INDEX idx_provider_key (provider_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='模型配置表';
@@ -192,11 +193,12 @@ CREATE TABLE IF NOT EXISTS model_price_configs (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
 
     UNIQUE KEY uk_model_price (
-        model_id,
-        image_size,
-        image_count,
-        video_duration,
-        video_resolution
+    model_id,
+    image_size,
+    image_count,
+    aspect_ratio,
+    video_duration,
+    video_resolution
     ),
 
     INDEX idx_model_enabled (model_id, enabled),

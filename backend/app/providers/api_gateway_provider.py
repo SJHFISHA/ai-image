@@ -1,6 +1,7 @@
 """
 API中转站调用模块
 """
+import mimetypes
 import requests
 from typing import Dict, Any, Optional
 
@@ -54,6 +55,30 @@ class ApiGatewayProvider(BaseProvider):
             return model
 
         return f"{model}{suffix}"
+
+    def _download_image_for_multipart(self, image_url: str, index: int) -> tuple[str, bytes, str]:
+        """
+        下载图片 URL，转换成 multipart 文件字段。
+        """
+        session = requests.Session()
+        session.trust_env = False
+
+        response = session.get(image_url, timeout=120)
+
+        if response.status_code >= 400:
+            raise Exception(f"参考图下载失败: {response.status_code} - {response.text}")
+
+        if not response.content:
+            raise Exception("参考图下载失败: 文件内容为空")
+
+        content_type = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
+        if not content_type.startswith("image/"):
+            content_type = "image/png"
+
+        suffix = mimetypes.guess_extension(content_type) or ".png"
+        filename = f"reference_{index}{suffix}"
+
+        return filename, response.content, content_type
 
     def generate_image(
         self,
@@ -127,6 +152,81 @@ class ApiGatewayProvider(BaseProvider):
 
         except requests.RequestException as e:
             error_msg = f"API请求错误: {str(e)}"
+            app_logger.error(error_msg)
+            raise Exception(error_msg)
+
+    def edit_image(
+        self,
+        model: str,
+        prompt: str,
+        image_urls: list[str],
+        route_mode: Optional[str] = None,
+        size: str = "1024x1024",
+        count: int = 1,
+        quality: str = "auto",
+        background: str = "auto",
+        moderation: str = "auto",
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        调用 API 中转站 GPT Image 2 图片编辑接口。
+        支持 1-2 张参考图，使用 multipart/form-data 多个同名 image 字段。
+        """
+        if not image_urls:
+            raise Exception("图片编辑至少需要 1 张参考图")
+
+        url = f"{self.base_url}/v1/images/edits"
+        routed_model = self._apply_route_suffix(model, route_mode)
+
+        data = {
+            "model": routed_model,
+            "prompt": prompt,
+            "n": str(count),
+            "size": size,
+            "quality": quality,
+            "background": background,
+            "moderation": moderation,
+        }
+
+        files = []
+        for index, image_url in enumerate(image_urls[:2], start=1):
+            filename, content, content_type = self._download_image_for_multipart(image_url, index)
+            files.append(
+                ("image", (filename, content, content_type))
+            )
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}"
+        }
+
+        app_logger.info(
+            f"调用API中转站图片编辑: model={routed_model}, size={size}, "
+            f"count={count}, refs={len(files)}, route_mode={route_mode}"
+        )
+
+        try:
+            session = requests.Session()
+            session.trust_env = False
+
+            response = session.post(
+                url,
+                data=data,
+                files=files,
+                headers=headers,
+                timeout=300,
+            )
+
+            if response.status_code >= 400:
+                error_msg = f"API图片编辑调用失败: {response.status_code} - {response.text}"
+                app_logger.error(error_msg)
+                raise Exception(error_msg)
+
+            result = response.json()
+            app_logger.info(f"API中转站图片编辑成功: model={routed_model}")
+            return result
+
+        except requests.RequestException as e:
+            error_msg = f"API图片编辑请求错误: {str(e)}"
             app_logger.error(error_msg)
             raise Exception(error_msg)
 
