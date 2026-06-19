@@ -30,6 +30,7 @@ interface ReferenceImageItem {
 }
 
 const selectedReferenceImages = ref<ReferenceImageItem[]>([])
+const isDraggingReferenceImage = ref(false)
 
 function revokeReferencePreviews() {
   selectedReferenceImages.value.forEach(item => {
@@ -347,9 +348,8 @@ function handleAgentModeMenu({ key }: { key: string | number }) {
   loadModelPrices()
 }
 
-function handleReferenceFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const files = Array.from(input.files || [])
+function addReferenceFiles(fileList: File[] | FileList) {
+  const files = Array.from(fileList)
   if (!files.length) return
 
   const remainingSlots = 2 - selectedReferenceImages.value.length
@@ -358,9 +358,9 @@ function handleReferenceFileChange(event: Event) {
     return
   }
 
-  const validFiles = files.slice(0, remainingSlots)
+  const validFiles: File[] = []
 
-  for (const file of validFiles) {
+  for (const file of files) {
     if (!file.type.startsWith('image/')) {
       message.warning('请选择图片文件')
       continue
@@ -371,6 +371,14 @@ function handleReferenceFileChange(event: Event) {
       continue
     }
 
+    validFiles.push(file)
+
+    if (validFiles.length >= remainingSlots) {
+      break
+    }
+  }
+
+  for (const file of validFiles) {
     selectedReferenceImages.value.push({
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       file,
@@ -382,6 +390,45 @@ function handleReferenceFileChange(event: Event) {
     selectedMode.value = 'edit'
     loadModelPrices()
   }
+}
+
+function handleReferenceFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  addReferenceFiles(input.files || [])
+  input.value = ''
+}
+
+function handleReferenceDragEnter(event: DragEvent) {
+  if (event.dataTransfer?.types.includes('Files')) {
+    isDraggingReferenceImage.value = true
+  }
+}
+
+function handleReferenceDragLeave(event: DragEvent) {
+  if (event.currentTarget === event.target) {
+    isDraggingReferenceImage.value = false
+  }
+}
+
+function handleReferenceDrop(event: DragEvent) {
+  isDraggingReferenceImage.value = false
+  const files = event.dataTransfer?.files
+  if (!files?.length) return
+
+  addReferenceFiles(files)
+}
+
+function handleReferencePaste(event: ClipboardEvent) {
+  const items = Array.from(event.clipboardData?.items || [])
+  const imageFiles = items
+    .filter(item => item.kind === 'file')
+    .map(item => item.getAsFile())
+    .filter((file): file is File => !!file && file.type.startsWith('image/'))
+
+  if (!imageFiles.length) return
+
+  event.preventDefault()
+  addReferenceFiles(imageFiles)
 }
 
 function removeReferenceImage(id: string) {
@@ -697,7 +744,15 @@ onMounted(() => {
         </div>
       </div>
     </div>
-    <div class="input-card">
+    <div
+      class="input-card"
+      :class="{ dragging: isDraggingReferenceImage }"
+      @dragenter.prevent="handleReferenceDragEnter"
+      @dragover.prevent
+      @dragleave.prevent="handleReferenceDragLeave"
+      @drop.prevent="handleReferenceDrop"
+      @paste="handleReferencePaste"
+    >
       <div class="input-area">
         <div
           class="reference-stack"
@@ -885,6 +940,12 @@ onMounted(() => {
   position: relative;
   z-index: 1;
 }
+
+.input-card.dragging {
+  outline: 2px dashed #1677ff;
+  outline-offset: 4px;
+  background: #f8fbff;
+}
 .chat-page.has-chat .input-card {
   position: fixed;
   left: calc(50% + 160px);
@@ -899,6 +960,10 @@ onMounted(() => {
 [data-theme='dark'] .input-card {
   background: #1f1f1f;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .input-card.dragging {
+  background: rgba(22, 119, 255, 0.08);
 }
 
 
