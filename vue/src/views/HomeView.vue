@@ -9,6 +9,7 @@ import {
   CopyOutlined,
   EditOutlined,
   DownloadOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { getModelPrices } from '@/api/modelPrice'
@@ -46,6 +47,15 @@ const sending = ref(false)
 const generatedImages = ref<string[]>([])
 const previewImage = ref('')
 const currentPrompt = ref('')
+
+interface RegeneratePayload {
+  mode: 'image' | 'edit'
+  prompt: string
+  priceConfigId: number
+  imageUrls?: string[]
+}
+
+const lastRegeneratePayload = ref<RegeneratePayload | null>(null)
 const promptExpanded = ref(false)
 const expandedHistoryMessageIds = ref<Set<string>>(new Set())
 
@@ -141,13 +151,171 @@ function editPrompt(text = currentPrompt.value) {
   promptExpanded.value = false
 }
 
-function downloadImage(image: string) {
-  const link = document.createElement('a')
-  link.href = image
-  link.download = `ai-image-${Date.now()}.png`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+async function downloadImage(image: string) {
+  try {
+    const response = await fetch(image, {
+      mode: 'cors',
+    })
+
+    if (!response.ok) {
+      throw new Error('图片下载失败')
+    }
+
+    const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const suffix = blob.type === 'image/jpeg' ? 'jpg' : 'png'
+
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = `ai-image-${Date.now()}.${suffix}`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    URL.revokeObjectURL(objectUrl)
+  } catch {
+    message.error('下载失败，请检查图片链接或稍后重试')
+  }
+}
+
+function getReferenceImageUrls(msg?: ConversationMessage) {
+  const metadata = msg?.metadata_json || {}
+  return metadata.reference_image_urls || (metadata.reference_image_url ? [metadata.reference_image_url] : [])
+}
+
+function findPreviousUserMessage(messageId: string) {
+  const index = historyMessages.value.findIndex(msg => msg.message_id === messageId)
+  if (index <= 0) return undefined
+
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const messageItem = historyMessages.value[i]
+    if (messageItem?.role === 'user') {
+      return messageItem
+    }
+  }
+
+  return undefined
+}
+
+async function resolveRegeneratePriceConfigId(taskId: string, mode: 'image' | 'edit') {
+  const task = await getTaskDetail(taskId)
+  const prices = await getModelPrices(mode === 'edit' ? 'image_edit' : 'image')
+  const matched = prices.items?.find(item =>
+    item.model_key === task.model_key &&
+    item.image_size === task.image_size &&
+    (item.aspect_ratio || '') === (task.aspect_ratio || '') &&
+    Number(item.image_count) === Number(task.image_count || 1)
+  )
+
+  if (!matched) {
+    throw new Error('未找到原任务对应的模型价格配置，无法重新生成')
+  }
+
+  return matched.id
+}
+
+async function submitRegenerate(payload: RegeneratePayload) {
+  if (!userStore.isLoggedIn) {
+    message.warning('请先登录')
+    return
+  }
+
+  if (sending.value) return
+
+  sending.value = true
+  currentPrompt.value = payload.prompt
+  promptExpanded.value = false
+  generatedImages.value = []
+
+  try {
+    const taskRes = payload.mode === 'edit'
+      ? await createImageEditTask({
+        session_id: currentSessionId.value || undefined,
+        price_config_id: payload.priceConfigId,
+        prompt: payload.prompt,
+        image_urls: payload.imageUrls || [],
+      })
+      : await createImageTask({
+        session_id: currentSessionId.value || undefined,
+        price_config_id: payload.priceConfigId,
+        prompt: payload.prompt,
+      })
+
+    if (!currentSessionId.value && taskRes.session_id) {
+      currentSessionId.value = taskRes.session_id
+      isCreatingSession.value = true
+      await router.replace({ path: '/image-generate', query: { session_id: taskRes.session_id } })
+    }
+
+    if (taskRes.status === 'success') {
+      const detail = await getTaskDetail(taskRes.task_id)
+
+      if (currentSessionId.value) {
+        const conversation = await getConversationDetail(currentSessionId.value)
+        historyMessages.value = conversation.messages || []
+        generatedImages.value = []
+        currentPrompt.value = ''
+      } else {
+        generatedImages.value = detail.images || []
+      }
+
+      message.success('图片重新生成成功')
+      await userStore.fetchUserInfo()
+      window.dispatchEvent(new Event('history-refresh'))
+      sending.value = false
+    } else if (taskRes.status === 'failed') {
+      generatedImages.value = []
+      message.error(taskRes.error_message ? `图片重新生成失败，积分已退回：${taskRes.error_message}` : '图片重新生成失败，积分已退回')
+      await userStore.fetchUserInfo()
+      window.dispatchEvent(new Event('history-refresh'))
+      sending.value = false
+    } else {
+      message.info('重新生成任务已提交，正在生成中...')
+      startPolling(taskRes.task_id)
+    }
+  } catch (error: unknown) {
+    const errorMessage =
+      error &&
+      typeof error === 'object' &&
+      'message' in error
+        ? String(error.message)
+        : '重新生成失败'
+
+    message.error(errorMessage)
+    sending.value = false
+  } finally {
+    isCreatingSession.value = false
+  }
+}
+
+async function regenerateCurrentResult() {
+  if (!lastRegeneratePayload.value) {
+    message.warning('没有可重新生成的记录')
+    return
+  }
+
+  await submitRegenerate(lastRegeneratePayload.value)
+}
+
+async function regenerateHistoryResult(msg: ConversationMessage) {
+  const userMessage = findPreviousUserMessage(msg.message_id)
+  const prompt = userMessage?.content_text?.trim()
+
+  if (!prompt || !msg.task_id) {
+    message.warning('缺少原提示词，无法重新生成')
+    return
+  }
+
+  const imageUrls = getReferenceImageUrls(userMessage)
+  const mode = imageUrls.length ? 'edit' : 'image'
+  const priceConfigId = await resolveRegeneratePriceConfigId(msg.task_id, mode)
+
+  await submitRegenerate({
+    mode,
+    prompt,
+    priceConfigId,
+    imageUrls,
+  })
 }
 
 function togglePromptExpanded() {
@@ -191,14 +359,28 @@ async function handleSend() {
       const uploadResults = await Promise.all(
         selectedReferenceImages.value.map(item => uploadReferenceImage(item.file))
       )
+      const imageUrls = uploadResults.map(item => item.url)
+
+      lastRegeneratePayload.value = {
+        mode: 'edit',
+        prompt: inputText.value,
+        priceConfigId: selectedPriceConfig.value.id,
+        imageUrls,
+      }
 
       taskRes = await createImageEditTask({
         session_id: currentSessionId.value || undefined,
         price_config_id: selectedPriceConfig.value.id,
         prompt: inputText.value,
-        image_urls: uploadResults.map(item => item.url),
+        image_urls: imageUrls,
       })
     } else {
+      lastRegeneratePayload.value = {
+        mode: 'image',
+        prompt: inputText.value,
+        priceConfigId: selectedPriceConfig.value.id,
+      }
+
       taskRes = await createImageTask({
         session_id: currentSessionId.value || undefined,
         price_config_id: selectedPriceConfig.value.id,
@@ -631,9 +813,21 @@ onMounted(() => {
               <button class="image-thumb-btn" type="button" @click="openImagePreview(asset.url)">
                 <img :src="asset.url" class="chat-result-image" alt="历史图片" />
               </button>
-              <button class="image-download-btn" type="button" title="下载" @click.stop="downloadImage(asset.url)">
-                <DownloadOutlined />
-              </button>
+              <div class="image-action-row">
+                <button class="image-action-btn" type="button" title="下载" @click.stop="downloadImage(asset.url)">
+                  <DownloadOutlined />
+                </button>
+                <button
+                  class="image-action-btn"
+                  type="button"
+                  title="重新生成"
+                  :disabled="sending"
+                  @click.stop="regenerateHistoryResult(msg)"
+                >
+                  <ReloadOutlined />
+                  <span>重新生成</span>
+                </button>
+              </div>
             </div>
           </div>
           <div v-else-if="msg.content_type === 'image' && msg.status === 'running'" class="generation-card">
@@ -732,14 +926,26 @@ onMounted(() => {
               />
             </button>
 
-            <button
-              class="image-download-btn"
-              type="button"
-              title="下载"
-              @click.stop="downloadImage(image)"
-            >
-              <DownloadOutlined />
-            </button>
+            <div class="image-action-row">
+              <button
+                class="image-action-btn"
+                type="button"
+                title="下载"
+                @click.stop="downloadImage(image)"
+              >
+                <DownloadOutlined />
+              </button>
+              <button
+                class="image-action-btn"
+                type="button"
+                title="重新生成"
+                :disabled="sending"
+                @click.stop="regenerateCurrentResult"
+              >
+                <ReloadOutlined />
+                <span>重新生成</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1483,24 +1689,46 @@ onMounted(() => {
   width: 100%;
 }
 
-.image-download-btn {
-  position: absolute;
-  right: 14px;
-  bottom: 14px;
-  width: 34px;
-  height: 34px;
+.image-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 8px 0 0;
+}
+
+.image-action-btn {
+  height: 30px;
+  padding: 0 10px;
   border: none;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.48);
-  color: #fff;
+  border-radius: 15px;
+  background: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.68);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 5px;
   cursor: pointer;
-  backdrop-filter: blur(8px);
+  font-size: 13px;
 }
 
-.image-download-btn:hover {
-  background: rgba(0, 0, 0, 0.68);
+.image-action-btn:hover {
+  background: rgba(0, 0, 0, 0.14);
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.image-action-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+[data-theme='dark'] .image-action-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+[data-theme='dark'] .image-action-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
 }
 </style>
