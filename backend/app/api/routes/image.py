@@ -126,6 +126,7 @@ async def upload_reference_image(
         data=ReferenceImageUploadResponse(
             asset_id="",
             url=uploaded["url"],
+            key=uploaded.get("key"),
         ),
         success=True,
     )
@@ -258,7 +259,10 @@ def create_image_edit_task(
         role="user",
         content_type="mixed",
         content_text=request.prompt,
-        metadata_json={"reference_image_urls": request.image_urls},
+        metadata_json={
+            "reference_image_urls": request.image_urls,
+            "reference_image_keys": request.image_keys,
+        },
     )
 
     try:

@@ -18,12 +18,14 @@ class ImageEditRequest(BaseModel):
     price_config_id: int = Field(..., description="模型价格配置ID")
     prompt: str = Field(..., min_length=1, max_length=2000, description="编辑提示词")
     image_urls: List[str] = Field(..., min_length=1, max_length=2, description="参考图片URL列表")
+    image_keys: Optional[List[str]] = Field(None, description="参考图片云端对象key列表")
 
 
 class ReferenceImageUploadResponse(BaseModel):
     """参考图片上传响应"""
     asset_id: str = Field(..., description="资源ID")
     url: str = Field(..., description="图片URL")
+    key: Optional[str] = Field(None, description="云端对象key")
 
 class TaskCreateResponse(BaseModel):
     """任务创建成功响应"""

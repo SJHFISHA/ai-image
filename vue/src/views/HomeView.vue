@@ -53,6 +53,7 @@ interface RegeneratePayload {
   prompt: string
   priceConfigId: number
   imageUrls?: string[]
+  imageKeys?: string[]
 }
 
 const lastRegeneratePayload = ref<RegeneratePayload | null>(null)
@@ -183,6 +184,11 @@ function getReferenceImageUrls(msg?: ConversationMessage) {
   return metadata.reference_image_urls || (metadata.reference_image_url ? [metadata.reference_image_url] : [])
 }
 
+function getReferenceImageKeys(msg?: ConversationMessage) {
+  const metadata = msg?.metadata_json || {}
+  return Array.isArray(metadata.reference_image_keys) ? metadata.reference_image_keys : []
+}
+
 function findPreviousUserMessage(messageId: string) {
   const index = historyMessages.value.findIndex(msg => msg.message_id === messageId)
   if (index <= 0) return undefined
@@ -234,6 +240,7 @@ async function submitRegenerate(payload: RegeneratePayload) {
         price_config_id: payload.priceConfigId,
         prompt: payload.prompt,
         image_urls: payload.imageUrls || [],
+        image_keys: payload.imageKeys,
       })
       : await createImageTask({
         session_id: currentSessionId.value || undefined,
@@ -307,6 +314,7 @@ async function regenerateHistoryResult(msg: ConversationMessage) {
   }
 
   const imageUrls = getReferenceImageUrls(userMessage)
+  const imageKeys = getReferenceImageKeys(userMessage)
   const mode = imageUrls.length ? 'edit' : 'image'
   const priceConfigId = await resolveRegeneratePriceConfigId(msg.task_id, mode)
 
@@ -315,6 +323,7 @@ async function regenerateHistoryResult(msg: ConversationMessage) {
     prompt,
     priceConfigId,
     imageUrls,
+    imageKeys,
   })
 }
 
@@ -360,12 +369,14 @@ async function handleSend() {
         selectedReferenceImages.value.map(item => uploadReferenceImage(item.file))
       )
       const imageUrls = uploadResults.map(item => item.url)
+      const imageKeys = uploadResults.map(item => item.key).filter((key): key is string => !!key)
 
       lastRegeneratePayload.value = {
         mode: 'edit',
         prompt: inputText.value,
         priceConfigId: selectedPriceConfig.value.id,
         imageUrls,
+        imageKeys,
       }
 
       taskRes = await createImageEditTask({
@@ -373,6 +384,7 @@ async function handleSend() {
         price_config_id: selectedPriceConfig.value.id,
         prompt: inputText.value,
         image_urls: imageUrls,
+        image_keys: imageKeys,
       })
     } else {
       lastRegeneratePayload.value = {

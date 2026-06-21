@@ -3,6 +3,8 @@
 """
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from typing import Optional
+from urllib.parse import urlparse
 
 from app.db.database import get_db
 from app.core.deps import get_current_user
@@ -21,6 +23,37 @@ from app.providers.qiniu_provider import qiniu_provider
 
 router = APIRouter(prefix="/conversations", tags=["会话"])
 
+def rebuild_reference_image_urls(metadata_json: Optional[dict]) -> Optional[dict]:
+    if not metadata_json:
+        return metadata_json
+
+    metadata = dict(metadata_json)
+    keys = metadata.get("reference_image_keys")
+
+    if isinstance(keys, list) and keys:
+        metadata["reference_image_urls"] = [
+            qiniu_provider.build_access_url(key)
+            for key in keys
+            if key
+        ]
+        return metadata
+
+    urls = metadata.get("reference_image_urls")
+    if isinstance(urls, list):
+        rebuilt_urls = []
+        for url in urls:
+            if not isinstance(url, str):
+                continue
+
+            path = urlparse(url).path.lstrip("/")
+            if path.startswith("ai-reference/"):
+                rebuilt_urls.append(qiniu_provider.build_access_url(path))
+            else:
+                rebuilt_urls.append(url)
+
+        metadata["reference_image_urls"] = rebuilt_urls
+
+    return metadata
 
 @router.post("", response_model=ApiResponse[ConversationItem], summary="创建会话")
 def create_conversation(
@@ -135,7 +168,7 @@ def get_conversation_detail(
             content_text=m.content_text,
             task_id=m.task_id,
             status=m.status,
-            metadata_json=m.metadata_json,
+            metadata_json=rebuild_reference_image_urls(m.metadata_json),
             assets=assets_by_message.get(m.message_id, []),
             created_at=m.created_at,
         )

@@ -10,6 +10,7 @@ from app.models.generation_task import GenerationTask
 from app.models.user import User
 from app.schemas.common import ApiResponse
 from app.schemas.generation import AssetItemResponse, AssetListResponse
+from app.providers.qiniu_provider import qiniu_provider
 
 router = APIRouter(prefix="/assets", tags=["资产"])
 
@@ -52,13 +53,15 @@ def get_assets(
 
     items = []
     for asset, task in rows:
+        asset_url = qiniu_provider.build_access_url(asset.object_key) if asset.object_key else asset.url
+
         items.append(AssetItemResponse(
             id=asset.id,
             asset_id=asset.asset_id,
             task_id=asset.task_id or "",
             type=asset.media_type,
-            url=asset.url,
-            cover_url=asset.url if asset.media_type == "image" else None,
+            url=asset_url,
+            cover_url=asset_url if asset.media_type == "image" else None,
             title=task.prompt if task else None,
             prompt=task.prompt if task else None,
             model_name=task.model_name if task else None,

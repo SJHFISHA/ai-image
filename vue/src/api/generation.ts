@@ -28,11 +28,13 @@ export interface CreateImageEditTaskParams {
   price_config_id: number
   prompt: string
   image_urls: string[]
+  image_keys?: string[]
 }
 
 export interface UploadReferenceImageResult {
   asset_id: string
   url: string
+  key?: string
 }
 
 // 响应数据类型
