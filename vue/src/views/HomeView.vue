@@ -222,30 +222,47 @@ async function applyTaskOptionsFromMessage(msg: ConversationMessage) {
   }
 }
 
-async function reusePromptToInput(msg: ConversationMessage) {
+async function reusePromptToInput(msg: ConversationMessage, openNewChat = false) {
   const prompt = msg.content_text?.trim()
   if (!prompt) return
 
   const referenceUrls = getReferenceImageUrls(msg)
   const referenceKeys = getReferenceImageKeys(msg)
 
+  selectedMode.value = referenceUrls.length ? 'edit' : 'image'
+  await loadModelPrices()
+  await applyTaskOptionsFromMessage(msg)
+
+  if (openNewChat) {
+    currentSessionId.value = null
+    historyMessages.value = []
+    generatedImages.value = []
+    previewImage.value = ''
+    currentPrompt.value = ''
+    promptExpanded.value = false
+    expandedHistoryMessageIds.value = new Set()
+
+    if (route.path === '/image-generate' && route.query.session_id) {
+      await router.replace({ path: '/image-generate', query: {} })
+    } else if (route.path !== '/image-generate') {
+      await router.push({ path: '/image-generate', query: {} })
+    }
+  } else {
+    generatedImages.value = []
+    previewImage.value = ''
+    currentPrompt.value = ''
+    promptExpanded.value = false
+  }
+
   inputText.value = prompt
-  generatedImages.value = []
-  previewImage.value = ''
-  currentPrompt.value = ''
-  promptExpanded.value = false
 
   if (referenceUrls.length) {
     applyReferenceImagesFromHistory(referenceUrls, referenceKeys)
-    selectedMode.value = 'edit'
   } else {
     clearReferenceImages()
-    selectedMode.value = 'image'
   }
 
-  await loadModelPrices()
-  await applyTaskOptionsFromMessage(msg)
-  message.success('已填入输入框')
+  message.success(openNewChat ? '已复制到新对话' : '已填入输入框')
 }
 
 function findPreviousUserMessage(messageId: string) {
@@ -870,6 +887,15 @@ onMounted(() => {
                 @click="reusePromptToInput(msg)"
               >
                 <CopyOutlined />
+              </button>
+
+              <button
+                class="prompt-action-btn"
+                type="button"
+                title="复制到新对话"
+                @click="reusePromptToInput(msg, true)"
+              >
+                <PlusOutlined />
               </button>
 
               <button
