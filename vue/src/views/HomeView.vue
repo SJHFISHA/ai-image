@@ -26,8 +26,10 @@ const historyMessages = ref<ConversationMessage[]>([])
 const inputText = ref('')
 interface ReferenceImageItem {
   id: string
-  file: File
   preview: string
+  file?: File
+  uploadedUrl?: string
+  key?: string
 }
 
 const selectedReferenceImages = ref<ReferenceImageItem[]>([])
@@ -35,7 +37,9 @@ const isDraggingReferenceImage = ref(false)
 
 function revokeReferencePreviews() {
   selectedReferenceImages.value.forEach(item => {
-    URL.revokeObjectURL(item.preview)
+    if (item.file && item.preview.startsWith('blob:')) {
+      URL.revokeObjectURL(item.preview)
+    }
   })
 }
 
@@ -129,17 +133,6 @@ function closeImagePreview() {
   previewImage.value = ''
 }
 
-async function copyPrompt(text = currentPrompt.value) {
-  const value = text.trim()
-  if (!value) return
-
-  try {
-    await navigator.clipboard.writeText(value)
-    message.success('已复制')
-  } catch {
-    message.error('复制失败')
-  }
-}
 
 function editPrompt(text = currentPrompt.value) {
   const value = text.trim()
@@ -187,6 +180,72 @@ function getReferenceImageUrls(msg?: ConversationMessage) {
 function getReferenceImageKeys(msg?: ConversationMessage) {
   const metadata = msg?.metadata_json || {}
   return Array.isArray(metadata.reference_image_keys) ? metadata.reference_image_keys : []
+}
+
+function findNextAssistantMessage(messageId: string) {
+  const index = historyMessages.value.findIndex(msg => msg.message_id === messageId)
+  if (index < 0) return undefined
+
+  for (let i = index + 1; i < historyMessages.value.length; i += 1) {
+    const messageItem = historyMessages.value[i]
+    if (messageItem?.role === 'assistant' && messageItem.task_id) {
+      return messageItem
+    }
+  }
+
+  return undefined
+}
+
+function applyReferenceImagesFromHistory(urls: string[], keys: string[]) {
+  clearReferenceImages()
+
+  selectedReferenceImages.value = urls.slice(0, 2).map((url, index) => ({
+    id: `history-${Date.now()}-${index}`,
+    preview: url,
+    uploadedUrl: url,
+    key: keys[index],
+  }))
+}
+
+async function applyTaskOptionsFromMessage(msg: ConversationMessage) {
+  const assistantMessage = findNextAssistantMessage(msg.message_id)
+  if (!assistantMessage?.task_id) return
+
+  try {
+    const task = await getTaskDetail(assistantMessage.task_id)
+    selectedModel.value = task.model_key
+    selectedResolution.value = task.image_size || ''
+    selectedAspectRatio.value = task.aspect_ratio || ''
+    selectedCount.value = String(task.image_count || 1)
+  } catch {
+    // 如果原任务详情获取失败，只保留当前默认配置
+  }
+}
+
+async function reusePromptToInput(msg: ConversationMessage) {
+  const prompt = msg.content_text?.trim()
+  if (!prompt) return
+
+  const referenceUrls = getReferenceImageUrls(msg)
+  const referenceKeys = getReferenceImageKeys(msg)
+
+  inputText.value = prompt
+  generatedImages.value = []
+  previewImage.value = ''
+  currentPrompt.value = ''
+  promptExpanded.value = false
+
+  if (referenceUrls.length) {
+    applyReferenceImagesFromHistory(referenceUrls, referenceKeys)
+    selectedMode.value = 'edit'
+  } else {
+    clearReferenceImages()
+    selectedMode.value = 'image'
+  }
+
+  await loadModelPrices()
+  await applyTaskOptionsFromMessage(msg)
+  message.success('已填入输入框')
 }
 
 function findPreviousUserMessage(messageId: string) {
@@ -366,8 +425,22 @@ async function handleSend() {
 
     if (selectedMode.value === 'edit') {
       const uploadResults = await Promise.all(
-        selectedReferenceImages.value.map(item => uploadReferenceImage(item.file))
+        selectedReferenceImages.value.map(async item => {
+          if (item.uploadedUrl) {
+            return {
+              url: item.uploadedUrl,
+              key: item.key,
+            }
+          }
+
+          if (!item.file) {
+            throw new Error('参考图数据异常，请重新选择图片')
+          }
+
+          return uploadReferenceImage(item.file)
+        })
       )
+
       const imageUrls = uploadResults.map(item => item.url)
       const imageKeys = uploadResults.map(item => item.key).filter((key): key is string => !!key)
 
@@ -627,7 +700,7 @@ function handleReferencePaste(event: ClipboardEvent) {
 
 function removeReferenceImage(id: string) {
   const target = selectedReferenceImages.value.find(item => item.id === id)
-  if (target) {
+  if (target?.file && target.preview.startsWith('blob:')) {
     URL.revokeObjectURL(target.preview)
   }
 
@@ -793,8 +866,8 @@ onMounted(() => {
               <button
                 class="prompt-action-btn"
                 type="button"
-                title="复制"
-                @click="copyPrompt(msg.content_text || '')"
+                title="填入输入框"
+                @click="reusePromptToInput(msg)"
               >
                 <CopyOutlined />
               </button>
@@ -875,8 +948,8 @@ onMounted(() => {
             <button
               class="prompt-action-btn"
               type="button"
-              title="复制"
-              @click="copyPrompt()"
+              title="填入输入框"
+              @click="inputText = currentPrompt"
             >
               <CopyOutlined />
             </button>
