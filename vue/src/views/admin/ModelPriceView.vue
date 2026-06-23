@@ -105,12 +105,26 @@
             placeholder="请选择或输入图片尺寸，如 1024x1024"
           />
         </a-form-item>
+        <a-form-item label="图片尺寸显示名">
+          <a-input
+            v-model:value="formData.image_size_label"
+            allow-clear
+            placeholder="例如：1024x1024（正方形），只用于前端显示"
+          />
+        </a-form-item>
         <a-form-item label="宽高比">
           <a-auto-complete
             v-model:value="formData.aspect_ratio"
             :options="aspectRatioOptions"
             allow-clear
             placeholder="请选择或输入宽高比，如 1:1"
+          />
+        </a-form-item>
+        <a-form-item label="宽高比显示名">
+          <a-input
+            v-model:value="formData.aspect_ratio_label"
+            allow-clear
+            placeholder="例如：1:1（正方形），只用于前端显示"
           />
         </a-form-item>
         <a-form-item label="图片数量">
@@ -174,8 +188,10 @@ const pagination = reactive({
 const formData = reactive({
   model_id: undefined as number | undefined,
   image_size: undefined as string | undefined,
+  image_size_label: undefined as string | undefined,
   image_count: 1,
   aspect_ratio: undefined as string | undefined,
+  aspect_ratio_label: undefined as string | undefined,
   points: 0,
   cost_amount: undefined as number | undefined,
   sort_order: 0,
@@ -264,8 +280,11 @@ function openCreateModal() {
   editingId.value = 0
   Object.assign(formData, {
     model_id: undefined,
-    image_size: undefined, image_count: 1,
+    image_size: undefined,
+    image_size_label: undefined,
+    image_count: 1,
     aspect_ratio: undefined,
+    aspect_ratio_label: undefined,
     points: 0,
     cost_amount: undefined, sort_order: 0, enabled: 1, remark: '',
   })
@@ -278,8 +297,10 @@ function openEditModal(record: ModelPriceConfig) {
   Object.assign(formData, {
     model_id: record.model_id,
     image_size: record.image_size,
+    image_size_label: record.image_size_label,
     image_count: record.image_count,
     aspect_ratio: record.aspect_ratio,
+    aspect_ratio_label: record.aspect_ratio_label,
     points: record.points,
     cost_amount: record.cost_amount,
     sort_order: record.sort_order,

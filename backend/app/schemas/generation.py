@@ -17,7 +17,7 @@ class ImageEditRequest(BaseModel):
     session_id: Optional[str] = Field(None, description="会话ID")
     price_config_id: int = Field(..., description="模型价格配置ID")
     prompt: str = Field(..., min_length=1, max_length=2000, description="编辑提示词")
-    image_urls: List[str] = Field(..., min_length=1, max_length=2, description="参考图片URL列表")
+    image_urls: List[str] = Field(..., min_length=1, max_length=5, description="参考图片URL列表")
     image_keys: Optional[List[str]] = Field(None, description="参考图片云端对象key列表")
 
 

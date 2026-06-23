@@ -28,8 +28,10 @@ class ModelPriceConfig(Base):
     billing_mode: Mapped[str] = mapped_column(String(32), default="fixed", comment="计费方式: fixed")
 
     image_size: Mapped[Optional[str]] = mapped_column(String(32), comment="图片尺寸，例如 1024x1024")
+    image_size_label: Mapped[Optional[str]] = mapped_column(String(64),comment="图片尺寸显示名称，例如 1024x1024（正方形）")
     image_count: Mapped[int] = mapped_column(Integer, default=1, comment="生成图片数量")
     aspect_ratio: Mapped[Optional[str]] = mapped_column(String(16), comment="宽高比，例如 1:1, 16:9, 9:16")
+    aspect_ratio_label: Mapped[Optional[str]] = mapped_column(String(64), comment="宽高比显示名称，例如 1:1（正方形）")
 
     video_duration: Mapped[Optional[int]] = mapped_column(Integer, comment="视频时长，单位秒")
     video_resolution: Mapped[Optional[str]] = mapped_column(String(32), comment="视频分辨率")

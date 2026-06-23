@@ -170,7 +170,7 @@ class ApiGatewayProvider(BaseProvider):
     ) -> Dict[str, Any]:
         """
         调用 API 中转站 GPT Image 2 图片编辑接口。
-        支持 1-2 张参考图，使用 multipart/form-data 多个同名 image 字段。
+        支持 1-5 张参考图，使用 multipart/form-data 多个同名 image 字段。
         """
         if not image_urls:
             raise Exception("图片编辑至少需要 1 张参考图")
@@ -189,7 +189,7 @@ class ApiGatewayProvider(BaseProvider):
         }
 
         files = []
-        for index, image_url in enumerate(image_urls[:2], start=1):
+        for index, image_url in enumerate(image_urls[:5], start=1):
             filename, content, content_type = self._download_image_for_multipart(image_url, index)
             files.append(
                 ("image", (filename, content, content_type))

@@ -96,8 +96,10 @@ export interface ModelPriceConfig {
   provider_key: string
   billing_mode: string
   image_size?: string
+  image_size_label?: string
   image_count: number
   aspect_ratio?: string
+  aspect_ratio_label?: string
   video_duration?: number
   video_resolution?: string
   points: number
@@ -114,8 +116,10 @@ export interface ModelPriceConfigCreateParams {
   model_id: number
   billing_mode?: string
   image_size?: string
+  image_size_label?: string
   image_count?: number
   aspect_ratio?: string
+  aspect_ratio_label?: string
   video_duration?: number
   video_resolution?: string
   points: number

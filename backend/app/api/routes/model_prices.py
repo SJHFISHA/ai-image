@@ -45,8 +45,10 @@ def get_model_prices(
             provider_key=config.model_config.provider_key,
             capability_type=config.model_config.capability_type,
             image_size=config.image_size,
+            image_size_label=config.image_size_label,
             image_count=config.image_count,
             aspect_ratio=config.aspect_ratio,
+            aspect_ratio_label=config.aspect_ratio_label,
             video_duration=config.video_duration,
             video_resolution=config.video_resolution,
             points=config.points

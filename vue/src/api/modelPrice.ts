@@ -10,8 +10,10 @@ export interface ModelPriceItem {
   model_name: string
   capability_type: string
   image_size?: string
+  image_size_label?: string
   image_count?: number
   aspect_ratio?: string
+  aspect_ratio_label?: string
   video_duration?: number
   video_resolution?: string
   points: number

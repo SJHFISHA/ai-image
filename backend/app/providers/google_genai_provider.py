@@ -206,7 +206,7 @@ class GoogleGenAIProvider(BaseProvider):
                         {"type": "text", "text": prompt},
                         *[
                             {"type": "image_url", "image_url": {"url": url}}
-                            for url in image_urls[:2]
+                            for url in image_urls[:5]
                         ],
                     ],
                 }

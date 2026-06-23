@@ -32,6 +32,8 @@ interface ReferenceImageItem {
   key?: string
 }
 
+const MAX_REFERENCE_IMAGES = 5
+
 const selectedReferenceImages = ref<ReferenceImageItem[]>([])
 const isDraggingReferenceImage = ref(false)
 
@@ -199,7 +201,7 @@ function findNextAssistantMessage(messageId: string) {
 function applyReferenceImagesFromHistory(urls: string[], keys: string[]) {
   clearReferenceImages()
 
-  selectedReferenceImages.value = urls.slice(0, 2).map((url, index) => ({
+  selectedReferenceImages.value = urls.slice(0, MAX_REFERENCE_IMAGES).map((url, index) => ({
     id: `history-${Date.now()}-${index}`,
     preview: url,
     uploadedUrl: url,
@@ -636,9 +638,9 @@ function addReferenceFiles(fileList: File[] | FileList) {
   const files = Array.from(fileList)
   if (!files.length) return
 
-  const remainingSlots = 2 - selectedReferenceImages.value.length
+  const remainingSlots = MAX_REFERENCE_IMAGES - selectedReferenceImages.value.length
   if (remainingSlots <= 0) {
-    message.warning('最多只能上传 2 张参考图')
+    message.warning(`最多只能上传 ${MAX_REFERENCE_IMAGES} 张参考图`)
     return
   }
 
@@ -759,6 +761,17 @@ const availableResolutions = computed(() => {
   return [...new Set(sizes)]
 })
 
+function getResolutionLabel(value?: string) {
+  if (!value) return ''
+
+  const config = priceConfigs.value.find(item =>
+    item.model_key === selectedModel.value &&
+    item.image_size === value
+  )
+
+  return config?.image_size_label || value
+}
+
 const selectedResolution = ref('')
 const resolutionOpen = ref(false)
 function handleResolutionMenu({ key }: { key: string | number }) {
@@ -777,6 +790,18 @@ const availableAspectRatios = computed(() => {
     .filter((r): r is string => !!r)
   return [...new Set(ratios)]
 })
+
+function getAspectRatioLabel(value?: string) {
+  if (!value) return ''
+
+  const config = priceConfigs.value.find(item =>
+    item.model_key === selectedModel.value &&
+    item.image_size === selectedResolution.value &&
+    item.aspect_ratio === value
+  )
+
+  return config?.aspect_ratio_label || value
+}
 
 const selectedAspectRatio = ref('')
 const aspectRatioOpen = ref(false)
@@ -1092,7 +1117,7 @@ onMounted(() => {
           </div>
 
           <label
-            v-if="selectedReferenceImages.length < 2"
+            v-if="selectedReferenceImages.length < MAX_REFERENCE_IMAGES"
             class="reference-add-card"
             :style="{ '--i': selectedReferenceImages.length }"
           >
@@ -1147,12 +1172,12 @@ onMounted(() => {
 
         <a-dropdown v-model:open="resolutionOpen" :trigger="['click']">
           <button class="toolbar-btn">
-            {{ selectedResolution || '图片分辨率' }}
+            {{ getResolutionLabel(selectedResolution) || '图片分辨率' }}
           </button>
           <template #overlay>
             <a-menu>
               <a-menu-item v-for="item in availableResolutions" :key="item" @click="handleResolutionMenu({ key: item })">
-                {{ item }}
+                {{ getResolutionLabel(item) }}
               </a-menu-item>
             </a-menu>
           </template>
@@ -1160,12 +1185,12 @@ onMounted(() => {
 
         <a-dropdown v-model:open="aspectRatioOpen" :trigger="['click']">
           <button class="toolbar-btn">
-            {{ selectedAspectRatio || '宽高比' }}
+            {{ getAspectRatioLabel(selectedAspectRatio) || '宽高比' }}
           </button>
           <template #overlay>
             <a-menu>
               <a-menu-item v-for="item in availableAspectRatios" :key="item" @click="handleAspectRatioMenu({ key: item })">
-                {{ item }}
+                {{ getAspectRatioLabel(item) }}
               </a-menu-item>
             </a-menu>
           </template>
@@ -1370,8 +1395,8 @@ onMounted(() => {
 }
 
 .reference-stack.expanded:hover {
-  width: 152px;
-  flex-basis: 152px;
+  width: 320px;
+  flex-basis: 320px;
 }
 
 .reference-stack.expanded:hover .reference-card,
