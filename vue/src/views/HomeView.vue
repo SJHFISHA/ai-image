@@ -846,6 +846,29 @@ async function loadModelPrices() {
   try {
     const res = await getModelPrices(selectedMode.value === 'edit' ? 'image_edit' : 'image')
     priceConfigs.value = res.items || []
+
+    // 检查当前选择的模型是否在新配置中仍然可用
+    const currentModelExists = priceConfigs.value.some(item => item.model_key === selectedModel.value)
+    const currentConfigExists = priceConfigs.value.some(item =>
+      item.model_key === selectedModel.value &&
+      item.image_size === selectedResolution.value &&
+      (item.aspect_ratio || '') === selectedAspectRatio.value &&
+      Number(item.image_count) === Number(selectedCount.value)
+    )
+
+    // 如果当前配置仍然可用，保留用户的选择
+    if (currentConfigExists) {
+      return
+    }
+
+    // 如果当前模型存在但配置变了，保留模型但重置其他选项
+    if (currentModelExists && selectedModel.value) {
+      selectedResolution.value = availableResolutions.value[0] || ''
+      selectedAspectRatio.value = availableAspectRatios.value[0] || ''
+      selectedCount.value = String(availableCounts.value[0] || 1)
+      return
+    }
+
     // 默认选中第一个
     const first = priceConfigs.value.at(0)
     if (first) {
