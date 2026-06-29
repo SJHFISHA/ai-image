@@ -1,22 +1,36 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Card, Row, Col, Statistic, Button, Space, Avatar } from 'ant-design-vue'
+import { Card, Row, Col, Statistic, Button, Space, Avatar, Input, message } from 'ant-design-vue'
 import {
   UserOutlined,
   PictureOutlined,
   WalletOutlined,
   FileTextOutlined,
   ThunderboltOutlined,
+  CopyOutlined,
+  GiftOutlined,
 } from '@ant-design/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { getPointBalance } from '@/api/points'
+import { useInviteCode } from '@/api/auth'
 import type { PointBalance } from '@/api/points'
+
+async function refreshPointBalance() {
+  try {
+    const res = await getPointBalance()
+    pointBalance.value = res
+  } catch {
+    // 静默处理
+  }
+}
 
 const router = useRouter()
 const userStore = useUserStore()
 const pointBalance = ref<PointBalance | null>(null)
 const loading = ref(true)
+const inviteCodeInput = ref('')
+const inviteLoading = ref(false)
 
 onMounted(async () => {
   try {
@@ -31,6 +45,39 @@ onMounted(async () => {
 
 function goTo(path: string) {
   router.push(path)
+}
+
+async function copyInviteCode() {
+  const code = userStore.userInfo?.invite_code
+  if (!code) return
+  try {
+    await navigator.clipboard.writeText(code)
+    message.success('邀请码已复制')
+  } catch {
+    message.error('复制失败，请手动复制')
+  }
+}
+
+async function handleSubmitInviteCode() {
+  if (!inviteCodeInput.value.trim()) {
+    message.warning('请输入邀请码')
+    return
+  }
+  inviteLoading.value = true
+  try {
+    await useInviteCode({ invite_code: inviteCodeInput.value.trim() })
+    message.success('邀请码使用成功，双方各获得50积分')
+    inviteCodeInput.value = ''
+    // 刷新用户信息和积分余额
+    await Promise.all([
+      userStore.fetchUserInfo(),
+      refreshPointBalance()
+    ])
+  } catch {
+    // 错误由 request 拦截器处理
+  } finally {
+    inviteLoading.value = false
+  }
 }
 </script>
 
@@ -89,6 +136,56 @@ function goTo(path: string) {
         </Card>
       </Col>
     </Row>
+
+    <Card class="invite-card">
+      <div class="invite-header">
+        <GiftOutlined class="invite-icon" />
+        <span class="invite-title">邀请好友</span>
+      </div>
+
+      <div class="invite-content">
+        <div class="invite-code-section">
+          <div class="invite-code-label">我的邀请码</div>
+          <div class="invite-code-row">
+            <span class="invite-code-value">{{ userStore.userInfo?.invite_code || '-' }}</span>
+            <Button type="link" size="small" @click="copyInviteCode" :disabled="!userStore.userInfo?.invite_code">
+              <CopyOutlined /> 复制
+            </Button>
+          </div>
+          <div class="invite-stats">
+            已邀请 <span class="stat-highlight">{{ userStore.userInfo?.invite_reward_count || 0 }}</span> 人，
+            剩余 <span class="stat-highlight">{{ userStore.userInfo?.invite_reward_remaining || 0 }}</span> 次奖励
+          </div>
+        </div>
+
+        <a-divider style="margin: 16px 0;" />
+
+        <div class="invite-use-section">
+          <div class="invite-code-label">填写邀请码</div>
+          <div class="invite-use-row">
+            <Input
+              v-model:value="inviteCodeInput"
+              placeholder="输入好友邀请码，双方各得50积分"
+              :maxlength="16"
+              :disabled="(userStore.userInfo?.used_invite_remaining || 5) <= 0"
+              @pressEnter="handleSubmitInviteCode"
+            />
+            <Button
+              type="primary"
+              :loading="inviteLoading"
+              :disabled="(userStore.userInfo?.used_invite_remaining || 5) <= 0"
+              @click="handleSubmitInviteCode"
+            >
+              提交
+            </Button>
+          </div>
+          <div class="invite-stats">
+            已填写 <span class="stat-highlight">{{ userStore.userInfo?.used_invite_count || 0 }}</span> 次，
+            剩余 <span class="stat-highlight">{{ userStore.userInfo?.used_invite_remaining || 0 }}</span> 次机会
+          </div>
+        </div>
+      </div>
+    </Card>
 
     <div class="quick-actions">
       <h3 class="section-title">快捷入口</h3>
@@ -212,6 +309,73 @@ function goTo(path: string) {
   font-size: 22px;
 }
 
+.invite-card {
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+
+.invite-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.invite-icon {
+  font-size: 20px;
+  color: #ff4d4f;
+}
+
+.invite-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.invite-content {
+  font-size: 14px;
+}
+
+.invite-code-label {
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.invite-code-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.invite-code-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1677ff;
+  letter-spacing: 2px;
+}
+
+.invite-stats {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.stat-highlight {
+  color: #1677ff;
+  font-weight: 500;
+}
+
+.invite-use-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.invite-use-row .ant-input {
+  flex: 1;
+}
+
 /* 暗黑模式样式 */
 [data-theme='dark'] .user-nickname {
   color: rgba(255, 255, 255, 0.88);
@@ -247,5 +411,22 @@ function goTo(path: string) {
 [data-theme='dark'] .action-card:hover {
   border-color: #1677ff;
   color: #1677ff;
+}
+
+[data-theme='dark'] .invite-card {
+  background: #1f1f1f;
+  border-color: #303030;
+}
+
+[data-theme='dark'] .invite-title {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+[data-theme='dark'] .invite-code-label {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+[data-theme='dark'] .invite-stats {
+  color: rgba(255, 255, 255, 0.45);
 }
 </style>

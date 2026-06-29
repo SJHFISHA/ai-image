@@ -29,6 +29,7 @@ const typeMap: Record<string, { text: string; color: string }> = {
   unfreeze: { text: '解冻', color: 'blue' },
   refund: { text: '退款', color: 'purple' },
   admin_adjust: { text: '后台调整', color: 'cyan' },
+  invite_reward: { text: '邀请奖励', color: 'magenta' },
 }
 
 const directionMap: Record<string, string> = {

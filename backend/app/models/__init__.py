@@ -9,6 +9,7 @@ from app.models.generation_task import GenerationTask
 from app.models.admin_user import AdminUser
 from app.models.conversation import ConversationSession, ConversationMessage, MediaAsset
 from app.models.notification import SystemNotification, UserNotificationRead
+from app.models.invitation import InvitationRecord
 
 __all__ = [
     "User",
@@ -25,4 +26,5 @@ __all__ = [
     "MediaAsset",
     "SystemNotification",
     "UserNotificationRead",
+    "InvitationRecord",
 ]

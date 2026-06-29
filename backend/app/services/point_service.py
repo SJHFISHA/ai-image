@@ -61,10 +61,11 @@ def add_points(
     transaction_type: str = "recharge",
     related_order_no: Optional[str] = None,
     remark: Optional[str] = None,
-    auto_commit: bool = True
+    auto_commit: bool = True,
+    count_as_recharge: bool = True
 ) -> PointTransaction:
     """
-    增加积分（充值到账）
+    增加积分
 
     Args:
         db: 数据库Session
@@ -74,6 +75,7 @@ def add_points(
         related_order_no: 关联订单号
         remark: 备注
         auto_commit: 是否自动提交事务，默认True。设为False时由调用方控制事务提交。
+        count_as_recharge: 是否计入累计充值，默认True。邀请奖励等传False。
 
     Returns:
         积分流水记录
@@ -95,7 +97,8 @@ def add_points(
 
     # 增加可用积分
     account.balance_points += points
-    account.total_recharged_points += points
+    if count_as_recharge:
+        account.total_recharged_points += points
 
     # 创建积分流水
     transaction_no = generate_transaction_no()

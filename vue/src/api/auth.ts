@@ -8,11 +8,16 @@ export interface RegisterParams {
   username: string
   password: string
   confirm_password: string
+  invite_code?: string
 }
 
 export interface LoginParams {
   username: string
   password: string
+}
+
+export interface UseInviteCodeParams {
+  invite_code: string
 }
 
 // 响应数据类型
@@ -22,6 +27,11 @@ export interface UserInfo {
   nickname?: string
   avatar_url?: string
   available_points?: number
+  invite_code?: string
+  invite_reward_count?: number
+  invite_reward_remaining?: number
+  used_invite_count?: number
+  used_invite_remaining?: number
 }
 
 export interface TokenResult {
@@ -37,6 +47,12 @@ export interface RegisterResult {
 
 export interface AvatarUploadResult {
   avatar_url: string
+}
+
+export interface UseInviteCodeResult {
+  reward_points: number
+  used_invite_count: number
+  used_invite_remaining: number
 }
 
 // 注册
@@ -61,4 +77,9 @@ export function uploadAvatar(file: File) {
   return httpPost<AvatarUploadResult>('/auth/avatar', formData, {
     headers: { 'Content-Type': undefined }
   })
+}
+
+// 使用邀请码
+export function useInviteCode(data: UseInviteCodeParams) {
+  return httpPost<UseInviteCodeResult>('/auth/use-invite-code', data)
 }

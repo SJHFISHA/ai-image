@@ -51,6 +51,18 @@
           />
         </a-form-item>
 
+        <a-form-item
+          label="邀请码"
+          name="inviteCode"
+        >
+          <a-input
+            v-model:value="formState.inviteCode"
+            placeholder="选填，填写好友邀请码双方各得50积分"
+            size="large"
+            :maxlength="16"
+          />
+        </a-form-item>
+
         <a-form-item>
           <a-button
             type="primary"
@@ -83,7 +95,8 @@ const loading = ref(false)
 const formState = reactive({
   username: '',
   password: '',
-  confirmPassword: ''
+  confirmPassword: '',
+  inviteCode: ''
 })
 
 const validateConfirmPassword = async (_rule: any, value: string) => {
@@ -98,7 +111,8 @@ const handleRegister = async () => {
     await userStore.register(
       formState.username,
       formState.password,
-      formState.confirmPassword
+      formState.confirmPassword,
+      formState.inviteCode || undefined
     )
   } finally {
     loading.value = false

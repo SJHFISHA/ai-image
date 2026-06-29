@@ -20,7 +20,8 @@ def register_user(
     db: Session,
     username: str,
     password: str,
-    confirm_password: str
+    confirm_password: str,
+    invite_code: str = None
 ) -> User:
     """
     用户注册
@@ -30,6 +31,7 @@ def register_user(
         username: 用户名
         password: 密码
         confirm_password: 确认密码
+        invite_code: 邀请码（可选）
 
     Returns:
         创建的用户对象
@@ -68,14 +70,21 @@ def register_user(
             detail="用户名已存在"
         )
 
+    # 延迟导入避免循环依赖
+    from app.services.invitation_service import generate_invite_code, use_invite_code
+
     try:
         # 开启事务
+        # 生成邀请码
+        user_invite_code = generate_invite_code(db)
+
         # 创建用户
         user = User(
             username=username,
             password_hash=hash_password(password),
             nickname=username,
-            status="normal"
+            status="normal",
+            invite_code=user_invite_code
         )
         db.add(user)
         db.flush()  # 获取user.id
@@ -90,12 +99,24 @@ def register_user(
         )
         db.add(point_account)
 
+        # 如果传入了邀请码，使用邀请码
+        if invite_code:
+            use_invite_code(
+                db=db,
+                invitee_user_id=user.id,
+                invite_code=invite_code,
+                auto_commit=False
+            )
+
         # 提交事务
         db.commit()
 
         app_logger.info(f"用户注册成功: username={username}, user_id={user.id}")
         return user
 
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         app_logger.error(f"用户注册失败: {str(e)}")

@@ -10,6 +10,12 @@ class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=2, max_length=64, description="用户名")
     password: str = Field(..., min_length=6, max_length=128, description="密码")
     confirm_password: str = Field(..., min_length=6, max_length=128, description="确认密码")
+    invite_code: Optional[str] = Field(None, max_length=16, description="邀请码")
+
+
+class UseInviteCodeRequest(BaseModel):
+    """使用邀请码请求"""
+    invite_code: str = Field(..., max_length=16, description="邀请码")
 
 
 class LoginRequest(BaseModel):
@@ -25,6 +31,11 @@ class UserInfo(BaseModel):
     nickname: Optional[str] = Field(None, description="昵称")
     avatar_url: Optional[str] = Field(None, description="头像URL")
     available_points: int = Field(default=0, description="可用积分")
+    invite_code: Optional[str] = Field(None, description="邀请码")
+    invite_reward_count: int = Field(default=0, description="邀请奖励次数")
+    invite_reward_remaining: int = Field(default=5, description="剩余邀请奖励次数")
+    used_invite_count: int = Field(default=0, description="已填写邀请码次数")
+    used_invite_remaining: int = Field(default=5, description="剩余填写邀请码次数")
 
     class Config:
         from_attributes = True
@@ -46,3 +57,10 @@ class RegisterResponse(BaseModel):
 class AvatarUploadResponse(BaseModel):
     """头像上传响应"""
     avatar_url: str = Field(..., description="头像访问URL")
+
+
+class UseInviteCodeResponse(BaseModel):
+    """使用邀请码响应"""
+    reward_points: int = Field(..., description="奖励积分")
+    used_invite_count: int = Field(..., description="已填写邀请码次数")
+    used_invite_remaining: int = Field(..., description="剩余填写邀请码次数")

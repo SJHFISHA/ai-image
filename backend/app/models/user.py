@@ -26,6 +26,9 @@ class User(Base):
 
     nickname: Mapped[Optional[str]] = mapped_column(String(64), comment="昵称")
     avatar_url: Mapped[Optional[str]] = mapped_column(String(255), comment="头像URL")
+    invite_code: Mapped[str] = mapped_column(String(16), unique=True, comment="邀请码")
+    invite_reward_count: Mapped[int] = mapped_column(default=0, comment="邀请奖励次数")
+    used_invite_count: Mapped[int] = mapped_column(default=0, comment="已填写邀请码次数")
 
     status: Mapped[str] = mapped_column(String(32), default="normal", comment="状态: normal, disabled")
 

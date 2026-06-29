@@ -21,8 +21,16 @@ export const useUserStore = defineStore('user', () => {
     try {
       const res = await loginApi({ username, password })
       token.value = res.access_token
-      userInfo.value = res.user
       localStorage.setItem('access_token', res.access_token)
+      // 登录后获取完整用户信息（包含邀请码等）
+      const success = await fetchUserInfo()
+      if (!success) {
+        // 获取用户信息失败，清除 token
+        token.value = ''
+        userInfo.value = null
+        localStorage.removeItem('access_token')
+        return false
+      }
       message.success('登录成功')
       router.push('/')
       return true
@@ -32,12 +40,13 @@ export const useUserStore = defineStore('user', () => {
   }
 
   // 注册
-  async function register(username: string, password: string, confirmPassword: string) {
+  async function register(username: string, password: string, confirmPassword: string, inviteCode?: string) {
     try {
       await registerApi({
         username,
         password,
-        confirm_password: confirmPassword
+        confirm_password: confirmPassword,
+        invite_code: inviteCode
       })
       message.success('注册成功，请登录')
       router.push('/login')

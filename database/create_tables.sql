@@ -1,31 +1,30 @@
 -- ============================================
 -- 1. 用户表
 -- ============================================
-CREATE TABLE IF NOT EXISTS users (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+CREATE TABLE `users`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `username` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '用户名',
+  `email` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '邮箱',
+  `phone` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '手机号',
+  `password_hash` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '密码哈希',
+  `nickname` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '昵称',
+  `avatar_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '头像',
+  `status` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'normal' COMMENT '状态: normal, disabled',
+  `last_login_at` datetime NULL DEFAULT NULL COMMENT '最后登录时间',
+  `last_login_ip` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '最后登录IP',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `invite_code` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '邀请码',
+  `invite_reward_count` int NOT NULL DEFAULT 0 COMMENT '邀请奖励次数',
+  `used_invite_count` int NOT NULL DEFAULT 0 COMMENT '已填写邀请码次数',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_username`(`username` ASC) USING BTREE,
+  UNIQUE INDEX `uk_email`(`email` ASC) USING BTREE,
+  UNIQUE INDEX `uk_phone`(`phone` ASC) USING BTREE,
+  INDEX `idx_status`(`status` ASC) USING BTREE,
+  UNIQUE INDEX `uk_invite_code`(`invite_code` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户表' ROW_FORMAT = Dynamic;
 
-    username VARCHAR(64) DEFAULT NULL COMMENT '用户名',
-    email VARCHAR(128) DEFAULT NULL COMMENT '邮箱',
-    phone VARCHAR(32) DEFAULT NULL COMMENT '手机号',
-
-    password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希',
-
-    nickname VARCHAR(64) DEFAULT NULL COMMENT '昵称',
-    avatar_url VARCHAR(255) DEFAULT NULL COMMENT '头像',
-
-    status VARCHAR(32) NOT NULL DEFAULT 'normal' COMMENT '状态: normal, disabled',
-
-    last_login_at DATETIME DEFAULT NULL COMMENT '最后登录时间',
-    last_login_ip VARCHAR(64) DEFAULT NULL COMMENT '最后登录IP',
-
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-
-    UNIQUE KEY uk_username (username),
-    UNIQUE KEY uk_email (email),
-    UNIQUE KEY uk_phone (phone),
-    INDEX idx_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 
 
 -- ============================================
@@ -388,4 +387,25 @@ CREATE TABLE IF NOT EXISTS user_notification_reads (
     UNIQUE KEY uk_user_notification_read (user_id, notification_id),
     INDEX idx_user_read (user_id, read_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户通知已读表';
+
+
+-- ======================== 积分邀请记录表 ========================
+CREATE TABLE IF NOT EXISTS invitation_records (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+
+    inviter_user_id BIGINT NOT NULL COMMENT '邀请人用户ID，即邀请码所属用户',
+    invitee_user_id BIGINT NOT NULL COMMENT '填写邀请码的用户ID',
+    invite_code VARCHAR(16) NOT NULL COMMENT '填写时使用的邀请码',
+
+    reward_points BIGINT NOT NULL DEFAULT 50 COMMENT '双方奖励积分',
+    reward_granted TINYINT NOT NULL DEFAULT 1 COMMENT '是否已发放奖励: 1=已发放, 0=未发放',
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+
+    UNIQUE KEY uk_inviter_invitee (inviter_user_id, invitee_user_id),
+    INDEX idx_inviter_user_id (inviter_user_id),
+    INDEX idx_invitee_user_id (invitee_user_id),
+    INDEX idx_invite_code (invite_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='邀请记录表';
+
 
